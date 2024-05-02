@@ -10,8 +10,9 @@ effects, etc.
 Use the normal build process for duo-examples. Note however that this target
 requires libasound which is not included in the usual duo-app-sdk that is installed
 by the envsetup.sh script. You must first run the envsetup.sh script and then
-copy in the includes and libraries for ALSA support. The following commands
-should help:
+copy in the includes and libraries for ALSA support from the full buildroot SDK
+(assuming you've already configured and built ALSA for your target device with
+the SDK). The following commands should help:
 
 ### includes
 ```
