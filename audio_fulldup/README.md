@@ -5,6 +5,14 @@ play and record) to loop audio from the ADC to DAC. Various command options may
 allow different kinds of processing in the path, including tone generation,
 effects, etc.
 
+## Prerequisites
+
+This requires the kernel to be rebuilt enabling the CV1800b internal codec for
+both input and output, and buildroot needs to be reconfigured to enable ALSA
+runtime tools, including libasound. The default device names are assigned with
+the assumption that the MAX98357a I2S output driver is available although it
+is not used by default.
+
 ## Building
 
 Use the normal build process for duo-examples. Note however that this target
