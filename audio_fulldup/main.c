@@ -3,6 +3,7 @@
  * 08-20-20 E. Brombaugh
  */
 
+#if 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -28,8 +29,8 @@ const char *btime = __TIME__;
 const int legal_rates[NUM_RATES] = {32000, 44100, 48000, 88200};
 
 /* state */
-char				*snd_device_in = "plughw:0,0";
-char 				*snd_device_out = "plughw:0,0";
+char				*snd_device_in = "hw:1,0";
+char 				*snd_device_out = "hw:2,0";
 snd_pcm_t			*playback_handle;
 snd_pcm_t			*capture_handle;
 snd_mixer_t			*mixer_handle;
@@ -342,8 +343,8 @@ int main(int argc, char **argv)
 	configure_alsa_audio(playback_handle, nchannels);
 	
 	/* init the mixer */
-	mixer_init();
-	mixer_set(play_vol);
+	//mixer_init();
+	//mixer_set(play_vol);
 
 	/* set up sizes */
 	frame_size = nchannels * (bits / 8);
@@ -397,3 +398,14 @@ int main(int argc, char **argv)
     
 	return 0;
 }
+#else
+
+#include <stdio.h>
+
+int main() {
+	printf("audio_fulldup: Hello, World!\n");
+
+	return 0;
+}
+
+#endif
