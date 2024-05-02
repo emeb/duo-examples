@@ -391,7 +391,7 @@ int main(int argc, char **argv)
 	snd_pcm_drain(playback_handle);
 	snd_pcm_drop(capture_handle);
 	free(rdbuf);
-	snd_mixer_close(mixer_handle);
+	//snd_mixer_close(mixer_handle);
 	snd_pcm_close(playback_handle);
 	snd_pcm_close(capture_handle);
     Audio_Close();
