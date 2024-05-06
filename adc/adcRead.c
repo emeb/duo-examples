@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 int main(){
 	if ((system("lsmod | grep -q \"cv180x_saradc\"") == 0)||(system("lsmod | grep -q \"cv181x_saradc\"") == 0)){
@@ -36,22 +37,30 @@ int main(){
 		return 1;
 	}
 	
-	char buffer[512];
+	char buffer[32];
+	int data[1024][2];
 	int len = 0;
 	int adc_value = 0;
+	struct timeval tv;
+	unsigned long time_in_micros;
+	int i;
 	
-	while(1){
-		for(int i = 0; i < sizeof(buffer); i++){
-			buffer[i] = 0;
-		}
+	for(i=0;i<1024;i++){
 		lseek(fd, 0, SEEK_SET);
-		len = read(fd, buffer, sizeof(buffer) -1);
+		len = read(fd, buffer, sizeof(buffer)-1);
 		if(len != 0){
+			buffer[len] = 0;
 			adc_value = atoi(buffer);
-			printf("ADC%c value is %d\n", adc_channel, adc_value);	
+			gettimeofday(&tv,NULL);
+			time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+			data[i][0] = adc_value;
+			data[i][1] = time_in_micros;
+			//printf("%8d -- ADC%c value is [%s] len %d = %d\n", time_in_micros, adc_channel, buffer, len, adc_value);	
 		}
-		sleep(1);
+		//sleep(1);
 	}
 	close(fd);
+	for(i=1;i<1024;i++)
+		printf("%8d:%5d\n", data[i][0], data[i][1]-data[i-1][1]);	
 	return 0;
 }
