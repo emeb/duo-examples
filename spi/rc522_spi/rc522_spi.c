@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include <wiringx.h>
-#include <rc522.h>
+#include "rc522.h"
 
  /* RC522（RFID读写模块）的示例代码。
     Example code to RC522 ，RFID module.
@@ -82,7 +82,10 @@ int main() {
     unsigned char status = 0;
     unsigned char str[MAX_LEN];
 
-    if(wiringXSetup("duo", NULL) == -1) {
+    // Duo:     milkv_duo
+    // Duo256M: milkv_duo256m
+    // DuoS:    milkv_duos
+    if(wiringXSetup("milkv_duo", NULL) == -1) {
         wiringXGC();
         return -1;
     }

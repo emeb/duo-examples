@@ -9,7 +9,10 @@ int fd_i2c;
 
 uint8_t duo_i2cinit(void)
 {
-    if(wiringXSetup("duo", NULL) == -1) {
+    // Duo:     milkv_duo
+    // Duo256M: milkv_duo256m
+    // DuoS:    milkv_duos
+    if(wiringXSetup("milkv_duo", NULL) == -1) {
         wiringXGC();
         return -1;
     }
@@ -85,5 +88,4 @@ uint8_t duo_spiwrite(uint8_t reg, uint8_t *buf, uint16_t len)   //用不到，�
 }
 void duo_rec_cb(uint8_t type)  //用不到，暂时不实现
 {
-    void;
 }

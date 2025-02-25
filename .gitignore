@@ -1,6 +1,6 @@
 
-/duo-sdk
-/duo-sdk.tar.gz
+/host-tools
+host-tools
 
 *.o
 

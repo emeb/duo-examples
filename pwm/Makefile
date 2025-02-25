@@ -1,4 +1,4 @@
-TARGET=adxl345_i2c
+TARGET=pwm
 
 ifeq (,$(TOOLCHAIN_PREFIX))
 $(error TOOLCHAIN_PREFIX is not set)
@@ -30,3 +30,4 @@ clean:
 	@rm *.o -rf
 	@rm $(OBJS) -rf
 	@rm $(TARGET)
+
