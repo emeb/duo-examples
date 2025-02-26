@@ -13,7 +13,7 @@ runtime tools, including libasound. The default device names are assigned with
 the assumption that the MAX98357a I2S output driver is available although it
 is not used by default.
 
-## Building
+## Building for SDK V1
 
 Use the normal build process for duo-examples. Note however that this target
 requires libasound which is not included in the usual duo-app-sdk that is installed
@@ -33,4 +33,23 @@ cp -r duo-buildroot-sdk/buildroot-2021.05/output/milkv-duo-lite_musl_riscv64/hos
 ### libraries
 ```
 cp -r duo-buildroot-sdk/buildroot-2021.05/output/milkv-duo-lite_musl_riscv64/host/riscv64-buildroot-linux-musl/sysroot/usr/lib/libasound.* duo-sdk/rootfs/lib
+```
+
+## Building for SDK V2
+
+File locations in SDK V2 (both buildroot and examples) are different. Use the
+following locations:
+
+### includes
+```
+cp -r ../duo_docker/duo-buildroot-sdk-v2/buildroot-2024.02/output/milkv-duo-musl-riscv64-sd/host/riscv64-buildroot-linux-musl/sysroot/usr/include/alsa include/system/
+cp -r ../duo_docker/duo-buildroot-sdk-v2/buildroot-2024.02/output/milkv-duo-musl-riscv64-sd/host/riscv64-buildroot-linux-musl/sysroot/usr/include/sound include/system/
+cp -r ../duo_docker/duo-buildroot-sdk-v2/buildroot-2024.02/output/milkv-duo-musl-riscv64-sd/host/riscv64-buildroot-linux-musl/sysroot/usr/include/asoundlib.h include/system/
+mkdir include/system/sys
+cp -r ../duo_docker/duo-buildroot-sdk-v2/buildroot-2024.02/output/milkv-duo-musl-riscv64-sd/host/riscv64-buildroot-linux-musl/sysroot/usr/include/sys/asoundlib.h include/system/sys
+```
+
+### libraries
+```
+cp -r ../duo_docker/duo-buildroot-sdk-v2/buildroot-2024.02/output/milkv-duo-musl-riscv64-sd/host/riscv64-buildroot-linux-musl/sysroot/usr/lib/libasound.* libs/system/musl_riscv64/
 ```
