@@ -30,7 +30,7 @@ const int legal_rates[NUM_RATES] = {32000, 44100, 48000, 88200};
 
 /* state */
 char				*snd_device_in = "hw:1,0";
-char 				*snd_device_out = "hw:2,0";
+char 				*snd_device_out = "hw:0,0";
 snd_pcm_t			*playback_handle;
 snd_pcm_t			*capture_handle;
 snd_mixer_t			*mixer_handle;
@@ -249,13 +249,23 @@ int main(int argc, char **argv)
     uint64_t samples;
     
 	/* parse options */
-	while((opt = getopt(argc, argv, "b:f:r:t:vVh")) != EOF)
+	while((opt = getopt(argc, argv, "b:i:o:r:t:vVh")) != EOF)
 	{
 		switch(opt)
 		{
 			case 'b':
 				/* buffer size */
 				buffer_size = atoi(optarg);
+				break;
+
+			case 'i':
+				/* input device */
+				snd_device_in = optarg;
+				break;
+
+			case 'o':
+				/* output device */
+				snd_device_out = optarg;
 				break;
 
 			case 'r':
@@ -291,6 +301,8 @@ int main(int argc, char **argv)
 				fprintf(stderr, "USAGE: %s [options]\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -b <Buffer Size>    Default: %d\n", buffer_size);
+				fprintf(stderr, "         -i <input device>   Default: %d\n", snd_device_in);
+				fprintf(stderr, "         -o <output device>  Default: %d\n", snd_device_out);
 				fprintf(stderr, "         -r <sample rate Hz> Default: %d\n", sample_rate);
 				fprintf(stderr, "         -t <time secs>      Default: %d\n", dlytime);
 				fprintf(stderr, "         -v enables verbose progress messages\n");

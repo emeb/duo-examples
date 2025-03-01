@@ -14,17 +14,13 @@ endif
 
 CC = $(TOOLCHAIN_PREFIX)gcc
 
-CFLAGS += -I$(SYSROOT)/usr/include
-
-LDFLAGS += -L$(SYSROOT)/lib
-LDFLAGS += -L$(SYSROOT)/usr/lib
 LDFLAGS += -lwiringx
 
 SOURCE = $(wildcard *.c)
 OBJS = $(patsubst %.c,%.o,$(SOURCE))
 
 $(TARGET): $(OBJS)
-	$(CC) -o $@ $(OBJS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
