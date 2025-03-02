@@ -29,7 +29,7 @@ const char *btime = __TIME__;
 const int legal_rates[NUM_RATES] = {32000, 44100, 48000, 88200};
 
 /* state */
-char				*snd_device_in = "hw:1,0";
+char				*snd_device_in = "hw:0,1";
 char 				*snd_device_out = "hw:0,0";
 snd_pcm_t			*playback_handle;
 snd_pcm_t			*capture_handle;
@@ -301,8 +301,8 @@ int main(int argc, char **argv)
 				fprintf(stderr, "USAGE: %s [options]\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -b <Buffer Size>    Default: %d\n", buffer_size);
-				fprintf(stderr, "         -i <input device>   Default: %d\n", snd_device_in);
-				fprintf(stderr, "         -o <output device>  Default: %d\n", snd_device_out);
+				fprintf(stderr, "         -i <input device>   Default: %s\n", snd_device_in);
+				fprintf(stderr, "         -o <output device>  Default: %s\n", snd_device_out);
 				fprintf(stderr, "         -r <sample rate Hz> Default: %d\n", sample_rate);
 				fprintf(stderr, "         -t <time secs>      Default: %d\n", dlytime);
 				fprintf(stderr, "         -v enables verbose progress messages\n");
