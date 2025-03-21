@@ -150,7 +150,8 @@ int Codec_Config(int file)
 	
 	while((reg = codec_settings[2*idx]) < 0x80)
 	{
-		if(!Codec_WriteRegister(file, reg, codec_settings[2*idx + 1]))
+		val = codec_settings[2*idx + 1];
+		if(!Codec_WriteRegister(file, reg, val))
 		{
 			qprintf("Codec_Config(): Write Addr %3d = 0x%02X\n\r", reg, val);
 		}
