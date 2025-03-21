@@ -56,5 +56,5 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	return codec_aic3101(bus);
+	return codec_aic3101(verbose, bus);
 }

@@ -11,6 +11,6 @@
 #include <errno.h>
 #include "codec_aic3101.h"
 
-int codec_aic3101(int bus);
+int codec_aic3101(int v, int b);
 
 #endif
