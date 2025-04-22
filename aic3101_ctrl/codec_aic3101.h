@@ -5,6 +5,6 @@
 #ifndef __codec_aic3101__
 #define __codec_aic3101__
 
-int codec_aic3101(int v, int b);
+int codec_aic3101(int v, int b, int type);
 
 #endif

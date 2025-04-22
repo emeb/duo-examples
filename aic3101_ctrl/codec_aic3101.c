@@ -46,10 +46,31 @@ struct i2c_smbus_ioctl_data {
 static int verbose;
 static int bus;
 
-/* register settings for default operation. contents is ADDR, DATA per line */
-#if 0
-/* No PLL, with MCLK */
-static uint8_t codec_settings[] = 
+/* Codec register settings. contents is ADDR, DATA per line */
+/* With PLL, with Int MCLK */
+static uint8_t codec_settings_int[] = 
+{
+	3,		0x91,	// PLL A - PLL ena, Q=2, P=1
+	4,		0x80,	// PLL B - J=32 : PLL rate = ((32.0 * 2) / (1 * 8)) * BCLK = Fs*256
+	7,		0x0A,	// datapath setup - left dac/left in, right dac/right in
+	11,		0x02,	// ovfl setup - PLL R = 2
+	15,		0x00,	// Left PGA - unmuted, 0dB
+	16,		0x00,	// Right PGA - unmuted, 0dB
+	19,		0x04,	// Left ADC - enabled, MIC1LP single, 0dB
+	22,		0x04,	// Right ADC - enabled, MIC1RP single, 0dB
+	37,		0xC0,	// DAC Power - left/right DACs enabled
+	41,		0x50,	// DAC Output Switching - use L3/R3 & independent vol
+	43,		0x00,	// Left DAC - unmuted, 0dB
+	44,		0x00,	// Right DAC - unmuted, 0dB
+	86,		0x09,	// Left LOP/M - umuted, 0dB, enabled (NOTE - DS error, bit 0 is R/W)
+	93,		0x09,	// Right LOP/M - umuted, 0dB, enabled (NOTE - DS error, bit 0 is R/W)
+	102,	0xA2,	// Clockgen - CLKDIV_IN uses BCLK, PLLDIV_IN uses BCLK
+	109,	0xC0,	// DAC Current - 100% increase over default
+	255,	0x00,	// EOF
+};
+
+/* No PLL, with Ext MCLK */
+static uint8_t codec_settings_ext[] = 
 {
 	7,		0x0A,	// datapath setup - left dac/left in, right dac/right in
 	19,		0x04,	// Left ADC - enabled, 0dB
@@ -66,28 +87,6 @@ static uint8_t codec_settings[] =
 	109,	0xC0,	// DAC Current - 100% increase over default
 	255,	0x00,	// EOF
 };
-#else
-/* With PLL, no MCLK */
-static uint8_t codec_settings[] = 
-{
-	3,		0x91,	// PLL A - PLL ena, Q=2, P=1
-	4,		0x80,	// PLL B - R=32
-	7,		0x0A,	// datapath setup - left dac/left in, right dac/right in
-	15,		0x00,	// Left PGA - unmuted, 0dB
-	16,		0x00,	// Right PGA - unmuted, 0dB
-	19,		0x04,	// Left ADC - enabled, MIC1LP single, 0dB
-	22,		0x04,	// Right ADC - enabled, MIC1RP single, 0dB
-	37,		0xC0,	// DAC Power - left/right DACs enabled
-	41,		0x50,	// DAC Output Switching - use L3/R3 & independent vol
-	43,		0x00,	// Left DAC - unmuted, 0dB
-	44,		0x00,	// Right DAC - unmuted, 0dB
-	86,		0x09,	// Left LOP/M - umuted, 0dB, enabled (NOTE - DS error, bit 0 is R/W)
-	93,		0x09,	// Right LOP/M - umuted, 0dB, enabled (NOTE - DS error, bit 0 is R/W)
-	102,	0xA0,	// Clockgen - CLKDIV_IN uses BCLK, PLLDIV_IN uses BCLK
-	109,	0xC0,	// DAC Current - 100% increase over default
-	255,	0x00,	// EOF
-};
-#endif
 
 /* wrapper for fprintf(stderr, ...) to support verbose control */
 static void qprintf(char *fmt, ...)
@@ -143,7 +142,7 @@ void Codec_Reset(void)
 /*
  * configure the default settings
  */
-int Codec_Config(int file)
+int Codec_Config(int file, uint8_t codec_settings[])
 {
 	int result = 0;
 	uint8_t idx = 0, reg, val;
@@ -169,7 +168,7 @@ int Codec_Config(int file)
 /*
  * Do all hardware setup for Codec
  */
-int codec_aic3101(int v, int bus)
+int codec_aic3101(int v, int bus, int type)
 {
 	int result = 0;
 	
@@ -203,7 +202,7 @@ int codec_aic3101(int v, int bus)
 	Codec_Reset();
 	
 	/* Set up codec */
-	result = Codec_Config(i2c_file);
+	result = Codec_Config(i2c_file, type & 1 ? codec_settings_ext : codec_settings_int );
 	
 fail2:
 	/* close bus */
