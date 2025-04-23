@@ -23,11 +23,11 @@ int main(int argc, char **argv)
 {
 	extern char *optarg;
 	int opt;
-	int bus = 1, i, verbose = 0, type = 0;
+	int bus = 1, i, verbose = 0, type = 0, dump = 0;
 	int iret;
     
 	/* parse options */
-	while((opt = getopt(argc, argv, "b:t:vVh")) != EOF)
+	while((opt = getopt(argc, argv, "b:devVh")) != EOF)
 	{
 		switch(opt)
 		{
@@ -36,9 +36,14 @@ int main(int argc, char **argv)
 				bus = atoi(optarg);
 				break;
 				
-			case 't':
+			case 'd':
+				/* register dump */
+				dump = 1;
+				break;
+				
+			case 'e':
 				/* type */
-				type = atoi(optarg);
+				type = 1;
 				break;
 				
 			case 'v':
@@ -54,7 +59,8 @@ int main(int argc, char **argv)
 				fprintf(stderr, "USAGE: %s [options]\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -b <I2C bus num>    Default: %d\n", bus);
-				fprintf(stderr, "         -t [0|1] Int(0, default), Ext(1) MCLK gen\n");
+				fprintf(stderr, "         -d dump I2C registers after setting\n");
+				fprintf(stderr, "         -e Ext MCLK gen (default Int w/ PLL)\n");
 				fprintf(stderr, "         -v enables verbose progress messages\n");
 				fprintf(stderr, "         -V prints the tool version\n");
 				fprintf(stderr, "         -h prints this help\n");
@@ -62,5 +68,5 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	return codec_aic3101(verbose, bus, type);
+	return codec_aic3101(verbose, bus, type, dump);
 }

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+#include <wiringx.h>
 
 /* The 7 bits Codec address (sent through I2C interface) */
 #define CODEC_ADDR 0x18
@@ -76,6 +77,7 @@ static uint8_t codec_settings_ext[] =
 	19,		0x04,	// Left ADC - enabled, 0dB
 	15,		0x00,	// Left PGA - unmuted, 0dB
 	16,		0x00,	// Right PGA - unmuted, 0dB
+	19,		0x04,	// Left ADC - enabled, MIC1LP single, 0dB
 	22,		0x04,	// Right ADC - enabled, 0dB
 	37,		0xC0,	// DAC Power - left/right DACs enabled
 	41,		0x50,	// DAC Output Switching - use L3/R3 & independent vol
@@ -118,9 +120,8 @@ static inline int32_t i2c_smbus_access(int file, char read_write, uint8_t comman
   * @brief  Writes to a given register into the TLV320AIC3101 audio codec
 			through the control interface (I2C)
   * @param  RegAddr: The address of the register to be written.
-  * @param  RegValue: pointer to array of values to be written to registers.
-  * @param  sz: number of registers to write.
-  * @retval HAL_OK if success
+  * @param  RegValue: value to be written to register.
+  * @retval 0 if success
   */
 int Codec_WriteRegister(int file, uint8_t RegAddr, uint8_t RegValue)
 {
@@ -132,11 +133,56 @@ int Codec_WriteRegister(int file, uint8_t RegAddr, uint8_t RegValue)
 								I2C_SMBUS_BYTE_DATA, &data);
 }
 
+/**
+  * @brief  Reads from a given register in the TLV320AIC3101 audio codec
+			through the control interface (I2C)
+  * @param  RegAddr: The address of the register to be read.
+  * @param  RegValue: pointer to array of values to be written to registers.
+  * @retval 0 if success
+  */
+int Codec_ReadRegister(int file, uint8_t RegAddr, uint8_t *RegValue)
+{
+	union i2c_smbus_data data;
+		
+	/* get data */
+	if(!i2c_smbus_access(file, I2C_SMBUS_READ, RegAddr,
+								I2C_SMBUS_BYTE_DATA, &data))
+	{
+		*RegValue = data.byte;
+		return 0;
+	}
+	else
+		return 1;	
+}
+
 /*
  * Resets the audio codec by toggling the HW NRST line.
  */
-void Codec_Reset(void)
+int Codec_Reset(void)
 {
+    int CODEC_NRST_PIN = 0; // this is the Duo header pin #, not the SoC pin.
+
+    // Duo:     milkv_duo
+    // Duo256M: milkv_duo256m
+    // DuoS:    milkv_duos
+    if(wiringXSetup("milkv_duo", NULL) == -1) {
+		printf("WiringX Setup failed\n");
+        wiringXGC();
+        return 1;
+    }
+
+    if(wiringXValidGPIO(CODEC_NRST_PIN) != 0) {
+        printf("Invalid GPIO %d\n", CODEC_NRST_PIN);
+    }
+
+    pinMode(CODEC_NRST_PIN, PINMODE_OUTPUT);
+	printf("Duo Codec NRST (wiringX) %d: Low\n", CODEC_NRST_PIN);
+	digitalWrite(CODEC_NRST_PIN, LOW);
+	usleep(1000);
+	printf("Duo Codec NRST (wiringX) %d: High\n", CODEC_NRST_PIN);
+	digitalWrite(CODEC_NRST_PIN, HIGH);
+	
+	return 0;
 }
 
 /*
@@ -168,7 +214,7 @@ int Codec_Config(int file, uint8_t codec_settings[])
 /*
  * Do all hardware setup for Codec
  */
-int codec_aic3101(int v, int bus, int type)
+int codec_aic3101(int v, int bus, int type, int dump)
 {
 	int result = 0;
 	
@@ -203,6 +249,22 @@ int codec_aic3101(int v, int bus, int type)
 	
 	/* Set up codec */
 	result = Codec_Config(i2c_file, type & 1 ? codec_settings_ext : codec_settings_int );
+
+	if(dump)
+	{
+		/* dump I2C registers in bank 0 */
+		for(int reg=0;reg<128;reg++)
+		{
+			uint8_t val;
+			if(!Codec_ReadRegister(i2c_file, reg, &val))
+				printf("Read Addr %3d = 0x%02X\n\r", reg, val);
+			else
+			{
+				printf("Read Addr %3d failed\n\r", reg);
+				break;
+			}
+		}
+	}
 	
 fail2:
 	/* close bus */
