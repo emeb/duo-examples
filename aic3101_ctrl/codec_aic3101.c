@@ -176,10 +176,10 @@ int Codec_Reset(void)
     }
 
     pinMode(CODEC_NRST_PIN, PINMODE_OUTPUT);
-	printf("Duo Codec NRST (wiringX) %d: Low\n", CODEC_NRST_PIN);
+	qprintf("Duo Codec NRST (wiringX) %d: Low\n", CODEC_NRST_PIN);
 	digitalWrite(CODEC_NRST_PIN, LOW);
 	usleep(1000);
-	printf("Duo Codec NRST (wiringX) %d: High\n", CODEC_NRST_PIN);
+	qprintf("Duo Codec NRST (wiringX) %d: High\n", CODEC_NRST_PIN);
 	digitalWrite(CODEC_NRST_PIN, HIGH);
 	
 	return 0;

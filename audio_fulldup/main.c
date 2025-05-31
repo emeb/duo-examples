@@ -25,12 +25,12 @@ const char *bdate = __DATE__;
 const char *btime = __TIME__;
 
 /* constants */
-#define NUM_RATES 4
-const int legal_rates[NUM_RATES] = {32000, 44100, 48000, 88200};
+#define NUM_RATES 5
+const int legal_rates[NUM_RATES] = {32000, 44100, 48000, 88200, 96000};
 
 /* state */
-char				*snd_device_in = "hw:0,1";
-char 				*snd_device_out = "hw:0,0";
+char				*snd_device_in = "hw:0,0";
+char 				*snd_device_out = "hw:0,1";
 snd_pcm_t			*playback_handle;
 snd_pcm_t			*capture_handle;
 snd_mixer_t			*mixer_handle;
@@ -38,7 +38,7 @@ snd_mixer_selem_id_t *sid;
 snd_mixer_elem_t	*elem;
 int					nchannels = 2;
 int					buffer_size = 4096;
-int					sample_rate = 48000;
+int					sample_rate = 96000;
 int 				bits = 16;
 int                 dlytime = 1;
 int 				err;
@@ -244,15 +244,21 @@ int main(int argc, char **argv)
 	extern char *optarg;
 	int opt;
 	struct sigaction sigIntHandler;
-	int i, verbose = 0;
+	int i, verbose = 0, proc = 0;
+	float amp = 0.6F, freq = 1000.0F;
 	int iret;
     uint64_t samples;
     
 	/* parse options */
-	while((opt = getopt(argc, argv, "b:i:o:r:t:vVh")) != EOF)
+	while((opt = getopt(argc, argv, "a:b:i:o:p:r:t:vVh")) != EOF)
 	{
 		switch(opt)
 		{
+			case 'a':
+				/* amplitude */
+				amp = atof(optarg);
+				break;
+			
 			case 'b':
 				/* buffer size */
 				buffer_size = atoi(optarg);
@@ -266,6 +272,11 @@ int main(int argc, char **argv)
 			case 'o':
 				/* output device */
 				snd_device_out = optarg;
+				break;
+
+			case 'p':
+				/* process type */
+				proc = atoi(optarg);
 				break;
 
 			case 'r':
@@ -300,9 +311,12 @@ int main(int argc, char **argv)
 			case '?':
 				fprintf(stderr, "USAGE: %s [options]\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
-				fprintf(stderr, "Options: -b <Buffer Size>    Default: %d\n", buffer_size);
+				fprintf(stderr, "Options: -a <amplitude  >    Default: %f\n", amp);
+				fprintf(stderr, "         -b <Buffer Size>    Default: %d\n", buffer_size);
+				fprintf(stderr, "         -f <freq>           Default: %f\n", freq);
 				fprintf(stderr, "         -i <input device>   Default: %s\n", snd_device_in);
 				fprintf(stderr, "         -o <output device>  Default: %s\n", snd_device_out);
+				fprintf(stderr, "         -p <process type  > Default: %d\n", proc);
 				fprintf(stderr, "         -r <sample rate Hz> Default: %d\n", sample_rate);
 				fprintf(stderr, "         -t <time secs>      Default: %d\n", dlytime);
 				fprintf(stderr, "         -v enables verbose progress messages\n");
@@ -319,7 +333,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Requested time exceeds max\n");
         exit(1);
     }
-	if(Audio_Init(samples))
+	if(Audio_Init(samples, proc, amp, freq))
     {
 		fprintf(stderr, "Audio Init failed\n");
         exit(1);
@@ -336,13 +350,7 @@ int main(int argc, char **argv)
 	sigIntHandler.sa_flags = 0;
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
-	/* open input and output devices */
-	if((err = snd_pcm_open(&capture_handle, snd_device_in, SND_PCM_STREAM_CAPTURE, 0)) < 0)
-	{
-		fprintf(stderr, "cannot open input audio device %s: %s\n", snd_device_out, snd_strerror(err));
-		exit(1);
-	}
-
+	/* open audio devices - output first because input is slaved */
 	if((err = snd_pcm_open(&playback_handle, snd_device_out, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
 	{
 		fprintf(stderr, "cannot open input audio device %s: %s\n", snd_device_in, snd_strerror(err));
@@ -350,6 +358,12 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	
+	if((err = snd_pcm_open(&capture_handle, snd_device_in, SND_PCM_STREAM_CAPTURE, 0)) < 0)
+	{
+		fprintf(stderr, "cannot open input audio device %s: %s\n", snd_device_out, snd_strerror(err));
+		exit(1);
+	}
+
 	/* set up both devices identically */
 	configure_alsa_audio(capture_handle,  nchannels);
 	configure_alsa_audio(playback_handle, nchannels);

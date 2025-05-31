@@ -14,7 +14,7 @@ endif
 
 CC = $(TOOLCHAIN_PREFIX)gcc
 
-#LDFLAGS += -lwiringx
+LDFLAGS += -lwiringx
 
 SOURCE = $(wildcard *.c)
 OBJS = $(patsubst %.c,%.o,$(SOURCE))

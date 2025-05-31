@@ -68,5 +68,7 @@ int main(int argc, char **argv)
 		}
 	}
 	
+	if(verbose)
+		printf("Configuring with %s MCLK profile\n", type ? "external" : "internal");
 	return codec_aic3101(verbose, bus, type, dump);
 }
