@@ -38,7 +38,7 @@ snd_mixer_selem_id_t *sid;
 snd_mixer_elem_t	*elem;
 int					nchannels = 2;
 int					buffer_size = 4096;
-int					sample_rate = 96000;
+int					sample_rate = 48000;
 int 				bits = 16;
 int                 dlytime = 1;
 int 				err;
