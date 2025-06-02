@@ -48,7 +48,7 @@ static int bus;
 
 /* Codec register settings. contents is ADDR, DATA per line */
 /* With PLL, with Int MCLK */
-static uint16_t codec_settings[] = 
+static uint16_t codec_settings_int[] = 
 {
 	// Reset and power-up
 	0,		0x000,	// Software Reset
@@ -78,8 +78,8 @@ static uint16_t codec_settings[] =
 	57,		0x001,	// RDAC to AUX1 (default) NEEDED!
 	
 	// Format & clock
-	4, 		0x010,	// 16-bit I2S
-#if 1
+	4, 		0x110,	// BCLK inv, 16-bit I2S
+#if 0
 	// No PLL
 	6,		0x000,	// MCLK, no PLL, 1x division, FS, BCLK inputs
 	7,		0x000,	// 4wire off, 48k, no timer (default)
@@ -94,6 +94,45 @@ static uint16_t codec_settings[] =
 	8,		0x034,	// CSB pin is PLL/16
 	1,		0x0ED,	// enable PLL
 #endif
+
+	255,	0x000,	// EOF
+};
+
+/* Without PLL, with Ext MCLK */
+static uint16_t codec_settings_ext[] = 
+{
+	// Reset and power-up
+	0,		0x000,	// Software Reset
+	1,		0x0CD,	// aux mixers, internal tie-off enable & 80k impedance for slow charge
+	69,		0x000,	// low voltage bias
+	127,	250,	// Wait 250ms
+	
+	// Input routing & ADC setup
+	2,		0x03F,	// ADC, PGA, Mix/Boost inputs powered up
+	//14,		0x108,	// HPF, 128x
+	14,		0x008,	// DC, 128x
+	
+	44,		0x044,	// PGA input - select line inputs
+	45, 	0x010,	// LPGA 0dB, unmuted, immediate, no ZC
+	46,		0x010,	// RPGA 0dB, unmuted, immediate, no ZC
+	47,		0x030,	// Lchl line in 0dB, no boost
+	48,		0x030,	// Rchl line in 0dB, no boost
+	
+	// Output routing & DAC setup
+	3,		0x18F,	// DACs and aux outputs enabled
+	10,		0x008,	// 128x rate
+	49,		0x002,	// thermal shutdown only (default)
+	50,		0x001,	// L main mixer input from LDAC (default) NEEDED!
+	51,		0x001,	// R main mixer input from RDAC (default) NEEDED!
+	56,		0x001,	// LDAC to AUX2 (default) NEEDED!
+	57,		0x001,	// RDAC to AUX1 (default) NEEDED!
+	
+	// Format & clock
+	4, 		0x110,	// BCLK inv, 16-bit I2S
+
+	// No PLL
+	6,		0x000,	// MCLK, no PLL, 1x division, FS, BCLK inputs
+	7,		0x000,	// 4wire off, 48k, no timer (default)
 
 	255,	0x000,	// EOF
 };
@@ -162,7 +201,7 @@ int Codec_ReadRegister(int file, uint8_t RegAddr, uint16_t *RegValue)
 	if(!i2c_smbus_access(file, I2C_SMBUS_READ, RegAddr,
 								I2C_SMBUS_HALFWORD_DATA, &data))
 	{
-		*RegValue = data.word;
+		*RegValue = ((data.word>>8)&0xff) | ((data.word&0xff)<<8);
 		return 0;
 	}
 	else
@@ -180,17 +219,32 @@ int Codec_Config(int file, uint16_t codec_settings[])
 	
 	while((reg = codec_settings[2*idx]) < 0x80)
 	{
+		/* get value */
 		val = codec_settings[2*idx + 1];
-		if(!Codec_WriteRegister(file, reg, val))
+		
+		if(reg == 0x7f)
 		{
-			qprintf("Codec_Config(): Write Addr %3d = 0x%02X\n\r", reg, val);
+			/* delay value ms */
+			qprintf("Codec_Config(): Delay %d ms\n\r", val);
+			usleep(val * 1000);
 		}
 		else
 		{
-			qprintf("Codec_Config(): Write Addr %3d failed\n\r", reg);
-			result = 1;
+			/* send value to reg */
+			if(!Codec_WriteRegister(file, reg, val))
+			{
+				qprintf("Codec_Config(): Write Addr %3d = 0x%02X\n\r", reg, val);
+			}
+			else
+			{
+				qprintf("Codec_Config(): Write Addr %3d failed\n\r", reg);
+				result = 1;
+			}
 		}
 		idx++;
+			
+		/* slow things down a bit? */
+		usleep(4000);
 	}
 	
 	return result;
@@ -230,7 +284,7 @@ int codec_nau88c22(int v, int bus, int type, int dump)
 		qprintf("codec_nau88c22: set address 0x%02X\n", CODEC_ADDR);
 	
 	/* Set up codec */
-	result = Codec_Config(i2c_file, codec_settings );
+	result = Codec_Config(i2c_file, type ? codec_settings_ext : codec_settings_int );
 
 	if(dump)
 	{
