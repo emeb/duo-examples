@@ -8,11 +8,8 @@
 #include <stdint.h>
 #include <getopt.h>
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/fb.h>
-#include <sys/mman.h>
+#include "st7789_fbdev.h"
+#include "gfx.h"
 
 /* version */
 const char *swVersionStr = "V0.1";
@@ -22,24 +19,11 @@ const char *bdate = __DATE__;
 const char *btime = __TIME__;
 
 /*
- * Pass 8-bit (each) R,G,B, get back 16-bit packed color
-*/
-uint16_t ST7789_Color565(uint32_t rgb24)
-{
-	uint16_t color16;
-	color16 = 	(((rgb24>>16) & 0xF8) << 8) |
-				(((rgb24>>8) & 0xFC) << 3) |
-				((rgb24 & 0xF8) >> 3);
-	
-	return color16;
-}
-/*
  * top level
  */
 int main(int argc, char **argv)
 {
 	extern char *optarg;
-	char *fbdev = "/dev/fb0";
 	int opt;
 	int backlight = 1, mode = 0, i, verbose = 0;
 	int iret;
@@ -86,61 +70,53 @@ int main(int argc, char **argv)
 	if(verbose)
         printf("MODE: %d\n", mode);
 	
-	/* handle backlight */
-	if(verbose)
-		printf("Turn %s Backlight...\n", backlight ? "on" : "off");
-	
-	char cmd[80];
-	sprintf(cmd, "echo %d > /sys/class/backlight/fb_st7789v/bl_power", backlight);
-	system(cmd);
-		
-	/* open device */
-	if(verbose)
-		printf("Opening device %s...\n", fbdev);
-	int fbfd = open (fbdev, O_RDWR);
-	if(fbfd < 0)
+	if(gfx_init(&ST7789_fbdev_drvr))
 	{
-		fprintf(stderr, "Couldn't open FB device %s\n", fbdev);
+		fprintf(stderr, "Couldn't init graphics lib\n");
 		exit(1);
 	}
-	
-	struct fb_var_screeninfo vinfo;
-	ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo);
-	int fb_width = vinfo.xres;
-	int fb_height = vinfo.yres;
-	int fb_bpp = vinfo.bits_per_pixel;
-	int fb_bytes = fb_bpp / 8;
-
 	if(verbose)
-	{
-		fprintf(stderr, "Width = %d\n", fb_width);
-		fprintf(stderr, "Height = %d\n", fb_height);
-		fprintf(stderr, "Bits/pixel = %d\n", fb_bpp);
-		fprintf(stderr, "Bytes = %d\n", fb_bytes);
-	}
+        printf("Graphics initialized\n");
 	
-	/* set up mmap for fbdev frame buffer */
-	int fb_data_size = fb_width * fb_height * fb_bytes;
-	uint16_t *fbdata = mmap (0, fb_data_size, 
-			PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, (off_t)0);
-	if(fbdata == MAP_FAILED)
-	{
-		fprintf(stderr, "Couldn't MMAP %d bytes\n", fb_data_size);
-		close(fbfd);
-		exit(1);
-	}
+	/* test some stuff */
+#if 0
+	printf("Test offsets.\n");
+	gfx_drawline(0, 0, 319, 169);
+	gfx_drawline(319, 0, 0, 169);
+	gfx_drawstr(0, 0, "0, 0");
+	gfx_drawstr(160, 85, "160, 85");
+	gfx_drawstr(255, 161, "255, 161");
+#else
+	printf("Rounded rects\n");
+	GFX_RECT rect = {2,2,317,167};
+	gfx_fillroundedrect(&rect, 20);
 	
-	if(verbose)
-		fprintf(stderr, "MMAP %d bytes succeeded\n", fb_data_size);
-
-	/* do stuff to the buffer */
-	uint16_t color = ST7789_Color565(0xFF << (mode*8));
-	for(int i=0;i<fb_data_size/2;i++)
-		fbdata[i] = color;
-
+	rect.x0 = 50;
+	rect.y0 = 50;
+	rect.x1 = 150;
+	rect.y1 = 150;
+	gfx_set_forecolor(GFX_CYAN);
+	gfx_fillroundedrect(&rect, 20);
+	
+	rect.x0 = 200;
+	rect.y0 = 20;
+	rect.x1 = 250;
+	rect.y1 = 160;
+	gfx_set_forecolor(GFX_MAGENTA);
+	gfx_fillroundedrect(&rect, 50);
+	
+	rect.x0 = 20;
+	rect.y0 = 10;
+	rect.x1 = 170;
+	rect.y1 = 40;
+	gfx_set_forecolor(GFX_BLUE);
+	gfx_fillroundedrect(&rect, 5);
+#endif
+	
 	/* clean up */
-	munmap(fbdata, fb_data_size);
-	close(fbfd);
+	if(verbose)
+        printf("Cleaning up\n");
+	ST7789_fbdev_deinit();
 	
 	return 0;
 }
