@@ -6,8 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#include <math.h>
 #include "st7789_fbdev.h"
 #include "gfx.h"
 
@@ -131,10 +133,46 @@ int main(int argc, char **argv)
 			gfx_set_txtscale(3);
 			gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2, "Hello");
 			break;
+		
+		case 2:
+			/* circles and lines */
+			printf("Test circles\n");
+			uint8_t hsv[] = {0,255,255};
+			GFX_COLOR color;
+			for(int i = 0;i<256;i+=16)
+			{
+				hsv[0] = i;
+				color = gfx_hsv2rgb(hsv);
+				gfx_set_forecolor(color);
+				int16_t x, y;
+				float th = (float)i * 6.2832F / 256.0F;
+				x = 160 + 70.0F*sinf(th);
+				y = 85 - 70.0F*cosf(th);
+				gfx_fillcircle(x, y, 10);
+			}
 			
+			gfx_set_forecolor(GFX_GREEN);
+			int cnt = 20;
+			int16_t x = 160, y = 85 - 55;
+			while(cnt--)
+			{
+				for(int i=0;i<256;i++)
+				{
+					float th = (float)i * 6.2832F / 256.0F;
+					gfx_set_forecolor(GFX_BLACK);
+					gfx_drawline(160,85,x, y);
+					x = 160 + 55.0F*sinf(th);
+					y = 85 - 55.0F*cosf(th);
+					gfx_set_forecolor(GFX_GREEN);
+					gfx_drawline(160,85,x, y);
+					usleep(4000);
+				}
+			}
+			break;
+		
 		default:
 			gfx_set_txtscale(3);
-			gfx_drawstrctr(160, 85-24, "Hello World!");
+			gfx_drawstrctr(160, 85, "Hello World!");
 	}
 	
 	/* clean up */
