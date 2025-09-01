@@ -68,6 +68,10 @@ int main(int argc, char **argv)
 	}
 	
 	if(verbose)
+		printf("Backlight: %s\n", backlight ? "on" : "off");
+	ST7789_fbdev_setBacklight(backlight);
+
+	if(verbose)
         printf("MODE: %d\n", mode);
 	
 	if(gfx_init(&ST7789_fbdev_drvr))
@@ -79,39 +83,59 @@ int main(int argc, char **argv)
         printf("Graphics initialized\n");
 	
 	/* test some stuff */
-#if 0
-	printf("Test offsets.\n");
-	gfx_drawline(0, 0, 319, 169);
-	gfx_drawline(319, 0, 0, 169);
-	gfx_drawstr(0, 0, "0, 0");
-	gfx_drawstr(160, 85, "160, 85");
-	gfx_drawstr(255, 161, "255, 161");
-#else
-	printf("Rounded rects\n");
-	GFX_RECT rect = {2,2,317,167};
-	gfx_fillroundedrect(&rect, 20);
-	
-	rect.x0 = 50;
-	rect.y0 = 50;
-	rect.x1 = 150;
-	rect.y1 = 150;
-	gfx_set_forecolor(GFX_CYAN);
-	gfx_fillroundedrect(&rect, 20);
-	
-	rect.x0 = 200;
-	rect.y0 = 20;
-	rect.x1 = 250;
-	rect.y1 = 160;
-	gfx_set_forecolor(GFX_MAGENTA);
-	gfx_fillroundedrect(&rect, 50);
-	
-	rect.x0 = 20;
-	rect.y0 = 10;
-	rect.x1 = 170;
-	rect.y1 = 40;
-	gfx_set_forecolor(GFX_BLUE);
-	gfx_fillroundedrect(&rect, 5);
-#endif
+	switch(mode)
+	{
+		case 0:
+			/* display extent */
+			printf("Test offsets.\n");
+			gfx_drawline(0, 0, 319, 169);
+			gfx_drawline(319, 0, 0, 169);
+			gfx_drawstr(0, 0, "0, 0");
+			gfx_drawstr(160, 85, "160, 85");
+			gfx_drawstr(255, 161, "255, 161");
+			break;
+		
+		case 1:
+			/* rounded rectangles */
+			printf("Test rounded rects\n");
+		
+			/* white background rect */
+			GFX_RECT rect = {2,2,317,167};
+			gfx_fillroundedrect(&rect, 20);
+			
+			/* cyan box */
+			rect.x0 = 50;
+			rect.y0 = 50;
+			rect.x1 = 150;
+			rect.y1 = 150;
+			gfx_set_forecolor(GFX_CYAN);
+			gfx_fillroundedrect(&rect, 20);
+			
+			/* magenta tall box w/ radius clamped to dimensions */
+			rect.x0 = 200;
+			rect.y0 = 20;
+			rect.x1 = 250;
+			rect.y1 = 160;
+			gfx_set_forecolor(GFX_MAGENTA);
+			gfx_fillroundedrect(&rect, 50);
+			
+			/* blue box with white text */
+			rect.x0 = 20;
+			rect.y0 = 10;
+			rect.x1 = 170;
+			rect.y1 = 40;
+			gfx_set_forecolor(GFX_BLUE);
+			gfx_fillroundedrect(&rect, 5);
+			gfx_set_backcolor(GFX_BLUE);
+			gfx_set_forecolor(GFX_WHITE);
+			gfx_set_txtscale(3);
+			gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2, "Hello");
+			break;
+			
+		default:
+			gfx_set_txtscale(3);
+			gfx_drawstrctr(160, 85-24, "Hello World!");
+	}
 	
 	/* clean up */
 	if(verbose)

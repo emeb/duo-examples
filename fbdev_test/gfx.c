@@ -595,6 +595,7 @@ void gfx_drawstrctr(int16_t x, int16_t y, char *str)
 
 	width = strlen(str)*8*txtsz;
 	x = x - width/2;
+	y = y - (8*txtsz)/2;
 	gfx_drawstr(x, y, str);
 }
 
