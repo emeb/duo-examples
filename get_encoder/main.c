@@ -99,18 +99,28 @@ int main(int argc, char **argv)
 	if(verbose)
 		printf("Setup open device...\n");
 	
-	int fd;
-	char *filename = "/dev/input/event0";
-
-	if((fd = open(filename, O_RDONLY)) < 0)
+	int fd[2];
+	char *filename[] = 
 	{
-		perror("get_encoder");
-		exit(1);
-	}
+		"/dev/input/event1",
+		"/dev/input/event0"
+	};
 
-	if(!isatty(fileno(stdout)))
-		setbuf(stdout, NULL);
-	
+	for(int j=0;j<2;j++)
+	{
+		if((fd[j] = open(filename[j], O_RDONLY)) < 0)
+		{
+			perror("get_encoder");
+			exit(1);
+		}
+		else
+		{
+			printf("Opened %s as fd[%d] = %d\n", filename[j], j, fd[j]);
+			ioctl(fd[j], EVIOCGRAB, (void*)1);
+		}
+	}
+		
+#if 0
 	int version;
 	unsigned short id[4];
 	char name[256] = "Unknown";
@@ -130,6 +140,7 @@ int main(int argc, char **argv)
 	ioctl(fd, EVIOCGNAME(sizeof(name)), name);
 	printf("Input device name: \"%s\"\n", name);
 	printf("Testing ... (interrupt to exit)\n");
+#endif
 
 	signal(SIGINT, interrupt_handler);
 	signal(SIGTERM, interrupt_handler);
@@ -138,48 +149,59 @@ int main(int argc, char **argv)
 	int i, rd;
 	fd_set rdfs;
 
-	FD_ZERO(&rdfs);
-	FD_SET(fd, &rdfs);
-
+	/* wait for events and process them */
 	while (!stop) {
-		select(fd + 1, &rdfs, NULL, NULL, NULL);
+		/* add the rotary and button to the read set and wait */
+		FD_ZERO(&rdfs);
+		FD_SET(fd[0], &rdfs);
+		FD_SET(fd[1], &rdfs);
+		select(fd[1] + 1, &rdfs, NULL, NULL, NULL);
 		if (stop)
 			break;
-		rd = read(fd, ev, sizeof(ev));
+		
+		/* look at both */
+		for(int j=0;j<2;j++)
+		{
+			/* if one is ready handle it */
+			if(FD_ISSET(fd[j], &rdfs))
+			{
+				printf("fd[%d] is set\n", j);
+				rd = read(fd[j], ev, sizeof(ev));
 
-		if (rd < (int) sizeof(struct input_event)) {
-			printf("expected %d bytes, got %d\n", (int) sizeof(struct input_event), rd);
-			perror("\nevtest: error reading");
-			return 1;
-		}
-
-		for (i = 0; i < rd / sizeof(struct input_event); i++) {
-			unsigned int type, code;
-
-			type = ev[i].type;
-			code = ev[i].code;
-
-			printf("Event: time %ld.%06ld, ", ev[i].input_event_sec, ev[i].input_event_usec);
-
-			if (type == EV_SYN) {
-				if (code == SYN_MT_REPORT)
-					printf("++++++++++++++ %d %d ++++++++++++\n", type, code);
-				else if (code == SYN_DROPPED)
-					printf(">>>>>>>>>>>>>> %d %d <<<<<<<<<<<<\n", type, code);
+				if (rd < (int) sizeof(struct input_event)) {
+					printf("expected %d bytes, got %d\n", (int) sizeof(struct input_event), rd);
+					perror("\nevtest: error reading");
+					return 1;
+				}
 				else
-					printf("-------------- %d %d ------------\n", type, code);
-			} else {
-				printf("type %d, code %d, ", type, code);
-				if (type == EV_MSC && (code == MSC_RAW || code == MSC_SCAN))
-					printf("value %02x\n", ev[i].value);
-				else
-					printf("value %d\n", ev[i].value);
+					printf("Got %d bytes = %ld events\n", rd, rd / sizeof(struct input_event));
+
+				for (i = 0; i < rd / sizeof(struct input_event); i++) {
+					unsigned int type, code;
+
+					type = ev[i].type;
+					code = ev[i].code;
+
+					printf("Event %d: time %ld.%06ld, ", i, ev[i].input_event_sec, ev[i].input_event_usec);
+
+					if(type != EV_SYN)
+					{
+						printf("type %d, code %d, ", type, code);
+						if (type == EV_MSC && (code == MSC_RAW || code == MSC_SCAN))
+							printf("value %02x\n", ev[i].value);
+						else
+							printf("value %d\n", ev[i].value);
+					}
+					else
+						printf("EV_SYN\n");
+				}
 			}
 		}
-
 	}
 
-	ioctl(fd, EVIOCGRAB, (void*)0);
+	/* ungrab the devices */
+	ioctl(fd[0], EVIOCGRAB, (void*)0);
+	ioctl(fd[1], EVIOCGRAB, (void*)0);
 	
 	return 0;
 }
