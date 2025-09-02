@@ -12,6 +12,7 @@
 #include <math.h>
 #include "st7789_fbdev.h"
 #include "gfx.h"
+#include "encoder.h"
 
 /* version */
 const char *swVersionStr = "V0.1";
@@ -167,6 +168,53 @@ int main(int argc, char **argv)
 					gfx_drawline(160,85,x, y);
 					usleep(4000);
 				}
+			}
+			break;
+		
+		case 3:
+			{
+				/* circles and lines */
+				printf("Test drawing + encoder\n");
+				uint8_t hsv[] = {0,255,255};
+				GFX_COLOR color;
+				for(int i = 0;i<256;i+=16)
+				{
+					hsv[0] = i;
+					color = gfx_hsv2rgb(hsv);
+					gfx_set_forecolor(color);
+					int16_t x, y;
+					float th = (float)i * 6.2832F / 256.0F;
+					x = 160 + 70.0F*sinf(th);
+					y = 85 - 70.0F*cosf(th);
+					gfx_fillcircle(x, y, 10);
+				}
+			
+				encoder_init();
+				int16_t val = 0;
+				uint8_t btn = 0;
+				gfx_set_forecolor(GFX_GREEN);
+				int16_t x = 160, y = 85 - 55;
+				gfx_drawline(160,85,x, y);
+				int i = 0;
+				while(1)
+				{
+					if(encoder_poll(&val, &btn))
+					{
+						i -= 16*val;
+						float th = (float)i * 6.2832F / 256.0F;
+						gfx_set_forecolor(GFX_BLACK);
+						gfx_drawline(160,85,x, y);
+						
+						if(btn&2)
+							break;
+						
+						x = 160 + 55.0F*sinf(th);
+						y = 85 - 55.0F*cosf(th);
+						gfx_set_forecolor(GFX_GREEN);
+						gfx_drawline(160,85,x, y);
+					}
+				}
+				encoder_deinit();
 			}
 			break;
 		
