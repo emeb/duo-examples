@@ -20,33 +20,10 @@
 #include <limits.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <poll.h>
 
 #define input_event_sec time.tv_sec
 #define input_event_usec time.tv_usec
-
-#define BITS_PER_LONG (sizeof(long) * 8)
-#define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
-#define OFF(x)  ((x)%BITS_PER_LONG)
-#define BIT(x)  (1UL<<OFF(x))
-#define LONG(x) ((x)/BITS_PER_LONG)
-#define test_bit(bit, array)	((array[LONG(bit)] >> OFF(bit)) & 1)
-
-#define DEV_INPUT_EVENT "/dev/input"
-#define EVENT_DEV_NAME "event"
-
-#ifndef EV_SYN
-#define EV_SYN 0
-#endif
-#ifndef SYN_MAX
-#define SYN_MAX 3
-#define SYN_CNT (SYN_MAX + 1)
-#endif
-#ifndef SYN_MT_REPORT
-#define SYN_MT_REPORT 2
-#endif
-#ifndef SYN_DROPPED
-#define SYN_DROPPED 3
-#endif
 
 /* version */
 const char *swVersionStr = "V0.1";
@@ -147,15 +124,19 @@ int main(int argc, char **argv)
 	
 	struct input_event ev[64];
 	int i, rd;
-	fd_set rdfs;
+	struct pollfd pfds[2];
+	pfds[0].fd = fd[0];
+	pfds[0].events = POLLIN;
+	pfds[1].fd = fd[1];
+	pfds[1].events = POLLIN;
 
 	/* wait for events and process them */
-	while (!stop) {
-		/* add the rotary and button to the read set and wait */
-		FD_ZERO(&rdfs);
-		FD_SET(fd[0], &rdfs);
-		FD_SET(fd[1], &rdfs);
-		select(fd[1] + 1, &rdfs, NULL, NULL, NULL);
+	int count = 0;	// tracking time
+	while(!stop)
+	{
+		/* check if event queues have data - timeout of 0 is nonblocking */
+		poll(pfds, 2, 0);
+		count++;
 		if (stop)
 			break;
 		
@@ -163,9 +144,10 @@ int main(int argc, char **argv)
 		for(int j=0;j<2;j++)
 		{
 			/* if one is ready handle it */
-			if(FD_ISSET(fd[j], &rdfs))
+			if(pfds[j].revents & POLLIN)
 			{
-				printf("fd[%d] is set\n", j);
+				printf("fd[%d] is set, count = %d\n", j, count);
+				count = 0;
 				rd = read(fd[j], ev, sizeof(ev));
 
 				if (rd < (int) sizeof(struct input_event)) {
