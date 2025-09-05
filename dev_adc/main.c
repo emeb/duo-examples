@@ -37,10 +37,14 @@ int main(int argc, char **argv)
 	unsigned long time_in_micros;
 	
 	/* parse options */
-	while((opt = getopt(argc, argv, "+vVh")) != EOF)
+	while((opt = getopt(argc, argv, "+c:vVh")) != EOF)
 	{
 		switch(opt)
 		{
+			case 'c':
+				inchl = optarg[0];
+				break;
+			
 			case 'v':
 				verbose = 1;
 				break;
@@ -54,6 +58,7 @@ int main(int argc, char **argv)
 				fprintf(stderr, "USAGE: %s [options] CHL\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -v enables verbose progress messages\n");
+				fprintf(stderr, "         -c CHL specify channel (default = 6)\n");
 				fprintf(stderr, "         -V prints the tool version\n");
 				fprintf(stderr, "         -h prints this help\n");
 				exit(1);
