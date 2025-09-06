@@ -13,6 +13,7 @@
 #include "st7789_fbdev.h"
 #include "gfx.h"
 #include "encoder.h"
+#include "adc.h"
 
 /* version */
 const char *swVersionStr = "V0.1";
@@ -30,6 +31,10 @@ int main(int argc, char **argv)
 	int opt;
 	int backlight = 1, mode = 0, i, verbose = 0;
 	int iret;
+	GFX_RECT rect;
+	char textbuf[32];
+	int16_t val = 0;
+	uint8_t btn = 0;
     
 	/* parse options */
 	while((opt = getopt(argc, argv, "+b:vVh")) != EOF)
@@ -62,7 +67,7 @@ int main(int argc, char **argv)
     if (optind < argc)
 	{
 		/* operating mode is first non-option argument */
-		mode = atoi(argv[optind]) & 3;
+		mode = atoi(argv[optind]);
     }
 	else
 	{
@@ -103,7 +108,10 @@ int main(int argc, char **argv)
 			printf("Test rounded rects\n");
 		
 			/* white background rect */
-			GFX_RECT rect = {2,2,317,167};
+			rect.x0 = 2;
+			rect.y0 = 2;
+			rect.x1 = 317;
+			rect.y1 = 167;
 			gfx_fillroundedrect(&rect, 20);
 			
 			/* cyan box */
@@ -216,6 +224,38 @@ int main(int argc, char **argv)
 				}
 				encoder_deinit();
 			}
+			break;
+		
+		case 4:
+			/* adc realtime */
+			encoder_init();
+			adc_init("/dev/cvi-saradc0");
+			while(1)
+			{
+				for(uint8_t i=0;i<4;i++)
+				{
+					adc_set_chl(i, 1);
+					val = adc_get_value();
+					sprintf(textbuf, "%1d: %4d", i, val);
+					gfx_set_forecolor(GFX_WHITE);
+					gfx_drawstr(20, 20+20*i, textbuf);
+					rect.x0 = 90;
+					rect.y0 = 20+20*i;
+					rect.x1 = 90+val/18;
+					rect.y1 = rect.y0+8;
+					gfx_set_forecolor(GFX_GREEN);
+					gfx_fillrect(&rect);
+					rect.x0 = rect.x1;
+					rect.x1 = 319;
+					gfx_set_forecolor(GFX_BLACK);
+					gfx_fillrect(&rect);
+				}
+				encoder_poll(&val, &btn);
+				if(btn&2)
+					break;
+			}
+			adc_deinit();
+			encoder_deinit();
 			break;
 		
 		default:
