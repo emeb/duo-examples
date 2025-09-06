@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 int8_t adc_init(char *device);
-void adc_set_chl(uint8_t chl);
+void adc_set_chl(uint8_t exchl, uint8_t inchl);
 uint16_t adc_get_value(void);
 void adc_deinit(void);
 

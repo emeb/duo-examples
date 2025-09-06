@@ -29,13 +29,13 @@ int8_t adc_init(char *device)
 }
 
 /*
- * send value to driver to set the internal mux to ADC1 and external mux
- * to desired channel
+ * send value to driver to set the int & ext muxes to ADC1
  */
-void adc_set_chl(uint8_t chl)
+void adc_set_chl(uint8_t exchl, uint8_t inchl)
 {
-	chl = ((chl & 3)<<3) | 1;
-	write(adcfd, &chl, 1);
+	exchl = ((exchl & 3)<<3) | (inchl & 7);
+	//exchl = ((exchl & 3)<<3) | 1;//(inchl & 7);
+	write(adcfd, &exchl, 1);
 }
 
 /*

@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <math.h>
 #include "adc.h"
 
 #define NUM_SMPLS 1024
@@ -27,21 +28,29 @@ int main(int argc, char **argv)
 {
 	extern char *optarg;
 	int opt;
-	int chl = 0, i, verbose = 0;
+	int nsamp = 1, i, verbose = 0;
 	int iret;
     char *devname = "/dev/cvi-saradc0";
-	uint8_t inchl = 0;
+	uint8_t inchl = 1, exchl = 0;
 	uint16_t data[NUM_SMPLS];
 	struct timeval tv;
 	unsigned long time_in_micros;
 	
 	/* parse options */
-	while((opt = getopt(argc, argv, "+c:vVh")) != EOF)
+	while((opt = getopt(argc, argv, "+i:x:n:vVh")) != EOF)
 	{
 		switch(opt)
 		{
-			case 'c':
+			case 'i':
 				inchl = atoi(optarg);
+				break;
+			
+			case 'x':
+				exchl = atoi(optarg);
+				break;
+			
+			case 'n':
+				nsamp = atoi(optarg);
 				break;
 			
 			case 'v':
@@ -57,7 +66,9 @@ int main(int argc, char **argv)
 				fprintf(stderr, "USAGE: %s [options] CHL\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -v enables verbose progress messages\n");
-				fprintf(stderr, "         -c CHL specify channel (default = 1)\n");
+				fprintf(stderr, "         -i CHL specify internal channel (default = 1)\n");
+				fprintf(stderr, "         -x CHL specify external channel (default = 0)\n");
+				fprintf(stderr, "         -n SMPLS specify num samples (default = 1)\n");
 				fprintf(stderr, "         -V prints the tool version\n");
 				fprintf(stderr, "         -h prints this help\n");
 				exit(1);
@@ -72,36 +83,37 @@ int main(int argc, char **argv)
 	}
 	
 	/* set the channel */
-	adc_set_chl(inchl);
+	adc_set_chl(exchl, inchl);
 	
-#if 1		
-	/* get a conversion */
-	if((data[0] = adc_get_value()) == 0xffff)
-	{
-		fprintf(stderr, "Error reading data\n");
-	}
-	else
-	{
-		fprintf(stdout, "Data = %d (0x%04X)\n", data[0], data[0]);
-	}
-#else
 	/* get multiple conversions */
 	gettimeofday(&tv,NULL);
 	time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-	for(int i = 0;i<NUM_SMPLS;i++)
+	for(int i = 0;i<nsamp;i++)
 	{
-		read(adcfd, &data[i], sizeof(uint16_t));
+		data[i] = adc_get_value();
 	}
 	gettimeofday(&tv,NULL);
 	time_in_micros = (1000000 * tv.tv_sec + tv.tv_usec) - time_in_micros;
 	
 	/* results */
-	for(int i = 0;i<NUM_SMPLS;i++)
+	float mean = 0.0F;
+	for(int i = 0;i<nsamp;i++)
 	{
-		fprintf(stdout, "% 2d: %d\n", i, data[i]);
+		if(verbose)
+			fprintf(stdout, "% 2d: %d\n", i, data[i]);
+		mean += (float)data[i];
 	}
+	mean = mean / (float)nsamp;
 	fprintf(stdout, "Avg time / sample = %d us\n", time_in_micros / NUM_SMPLS);
-#endif
+	fprintf(stdout, "Avg value = %f\n", mean);
+	float var = 0.0F;
+	mean *= mean;
+	for(int i = 0;i<nsamp;i++)
+	{
+		var += ((float)data[i]*(float)data[i]) - mean;
+	}
+	var = var /(float)nsamp;
+	fprintf(stdout, "Std. Dev = %f\n", sqrtf(var));
 	
 	/* close it */
 	adc_deinit();
