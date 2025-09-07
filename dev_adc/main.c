@@ -80,7 +80,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-#if 1
+#if 0
+	/* test max access at high speed for CPU loading */
 	uint16_t darray[4];
 	while(1)
 	{
