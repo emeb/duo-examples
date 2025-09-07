@@ -12,8 +12,6 @@
 #include <math.h>
 #include "adc.h"
 
-#define NUM_SMPLS 1024
-
 /* version */
 const char *swVersionStr = "V0.1";
 
@@ -32,7 +30,7 @@ int main(int argc, char **argv)
 	int iret;
     char *devname = "/dev/cvi-saradc0";
 	uint8_t inchl = 1, exchl = 0;
-	uint16_t data[NUM_SMPLS];
+	uint16_t *data;
 	struct timeval tv;
 	unsigned long time_in_micros;
 	
@@ -82,6 +80,24 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
+#if 1
+	uint16_t darray[4];
+	while(1)
+	{
+		adc_set_chl(exchl, inchl);
+		exchl = (exchl+1)&3;
+		darray[exchl] = adc_get_value();
+	}
+#endif
+
+	/* allocate memory for samples */
+	if(!(data = malloc(nsamp * sizeof(uint16_t))))
+	{
+		fprintf(stderr, "Couldn't allocte sample memory\n");
+		adc_deinit();
+		return 1;
+	}
+	
 	/* set the channel */
 	adc_set_chl(exchl, inchl);
 	
@@ -104,7 +120,7 @@ int main(int argc, char **argv)
 		mean += (float)data[i];
 	}
 	mean = mean / (float)nsamp;
-	fprintf(stdout, "Avg time / sample = %d us\n", time_in_micros / NUM_SMPLS);
+	fprintf(stdout, "Avg time / sample = %d us\n", time_in_micros / nsamp);
 	fprintf(stdout, "Avg value = %f\n", mean);
 	float var = 0.0F;
 	mean *= mean;
