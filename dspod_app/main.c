@@ -3,7 +3,6 @@
  * 09-07-25 E. Brombaugh
  */
 
-#if 1
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -55,7 +54,8 @@ char				*rdbuf;
 unsigned int		fragments = 2;
 int					frame_size;
 snd_pcm_uframes_t   frames, inframes, outframes;
-uint16_t			adc_buffer[4];
+float				adc_iir[4];
+int16_t				adc_buffer[4];
 uint8_t				adc_idx;
 
 /*
@@ -176,19 +176,42 @@ void *adc_thread_handler(void *ptr)
 	/* processing loop */
 	fprintf(stderr, "Starting ADC thread\n");
 	adc_idx = 0;
+	adc_iir[0] = 0.0F;
+	adc_iir[1] = 0.0F;
+	adc_iir[2] = 0.0F;
+	adc_iir[3] = 0.0F;
+	adc_buffer[0] = 0;
+	adc_buffer[1] = 0;
+	adc_buffer[2] = 0;
+	adc_buffer[3] = 0;
 	while(!exit_program)
 	{
+		uint16_t sample;
+	
 		/* set mux */
 		adc_set_chl(adc_idx, 1);
 		
 		/* trigger conversion & get value */
-		adc_buffer[adc_idx] = adc_get_value();
+		sample = adc_get_value();
+		
+		if(sample != 0xffff)
+		{
+			float temp = (3910-sample) / 3910.0F;
+			int16_t raw;
+			
+			/* IIR filter */
+			adc_iir[adc_idx] += (temp - adc_iir[adc_idx]) * 0.05F;
+			raw = floor(4095 * adc_iir[adc_idx] + 0.5F);
+			raw = raw > 4095 ? 4095 : raw;
+			raw = raw < 0 ? 0 : raw;
+			adc_buffer[adc_idx] = raw;
+		}
 		
 		/* update channel */
 		adc_idx = (adc_idx + 1) & 3;
 		
-		/* wait 5ms for total update rate of 50Hz */
-		usleep(5000);
+		/* wait 1,25ms for total update rate of 200Hz */
+		usleep(1250);
 	}
 }
 
@@ -538,14 +561,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-#else
-
-#include <stdio.h>
-
-int main() {
-	printf("audio_fulldup: Hello, World!\n");
-
-	return 0;
-}
-
-#endif
