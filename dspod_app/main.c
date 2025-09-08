@@ -270,7 +270,7 @@ int main(int argc, char **argv)
 	extern char *optarg;
 	int opt;
 	struct sigaction sigIntHandler;
-	int i, verbose = 0, proc = 0;
+	int i, codec = 0, verbose = 0, proc = 0;
 	float amp = 0.6F, freq = 1000.0F;
 	int iret;
     uint64_t samples;
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 	uint8_t btn = 0;
 
 	/* parse options */
-	while((opt = getopt(argc, argv, "a:b:i:o:p:r:t:vVh")) != EOF)
+	while((opt = getopt(argc, argv, "a:b:ci:o:p:r:t:vVh")) != EOF)
 	{
 		switch(opt)
 		{
@@ -292,6 +292,11 @@ int main(int argc, char **argv)
 			case 'b':
 				/* buffer size */
 				buffer_size = atoi(optarg);
+				break;
+
+			case 'c':
+				/* codec */
+				codec = 1;
 				break;
 
 			case 'i':
@@ -343,6 +348,7 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
 				fprintf(stderr, "Options: -a <amplitude  >    Default: %f\n", amp);
 				fprintf(stderr, "         -b <Buffer Size>    Default: %d\n", buffer_size);
+				fprintf(stderr, "         -c init codec (default no)\n");
 				fprintf(stderr, "         -f <freq>           Default: %f\n", freq);
 				fprintf(stderr, "         -i <input device>   Default: %s\n", snd_device_in);
 				fprintf(stderr, "         -o <output device>  Default: %s\n", snd_device_out);
@@ -416,18 +422,20 @@ int main(int argc, char **argv)
 	if(verbose)
 		printf("ADC initialized\n");
 
-	if(codec_nau88c22(verbose, 1, 0, 0))
+	/* optionally init the codec */
+	if(codec)
 	{
-		fprintf(stderr, "Error initializing codec\n");
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-		exit(1);
+		if(codec_nau88c22(verbose, 1, 0, 0))
+		{
+			fprintf(stderr, "Error initializing codec\n");
+			adc_deinit();
+			encoder_deinit();
+			ST7789_fbdev_deinit();
+			exit(1);
+		}
+		printf("Codec initialized\n");
 	}
 	
-	if(verbose)
-		printf("Codec initialized\n");
-
 	/* set up audio processing */
     samples  = sample_rate * dlytime;
     if(samples > ((uint64_t)1<<32))

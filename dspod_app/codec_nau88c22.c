@@ -214,7 +214,7 @@ int Codec_ReadRegister(int file, uint8_t RegAddr, uint16_t *RegValue)
 int Codec_Config(int file, uint16_t codec_settings[])
 {
 	int result = 0;
-	uint8_t idx = 0, reg;
+	uint8_t idx = 0, reg, tries;
 	uint16_t val;
 	
 	while((reg = codec_settings[2*idx]) < 0x80)
@@ -231,6 +231,19 @@ int Codec_Config(int file, uint16_t codec_settings[])
 		else
 		{
 			/* send value to reg */
+#if 1
+			tries = 0;
+			while((Codec_WriteRegister(file, reg, val) != 0 ) && (tries++ < 5));
+			if(tries <5)
+			{
+				qprintf("Codec_Config(): Write Addr %3d = 0x%02X (%d retries)\n\r", reg, val, tries);
+			}
+			else
+			{
+				qprintf("Codec_Config(): Write Addr %3d failed\n\r", reg);
+				result = 1;
+			}
+#else
 			if(!Codec_WriteRegister(file, reg, val))
 			{
 				qprintf("Codec_Config(): Write Addr %3d = 0x%02X\n\r", reg, val);
@@ -240,6 +253,7 @@ int Codec_Config(int file, uint16_t codec_settings[])
 				qprintf("Codec_Config(): Write Addr %3d failed\n\r", reg);
 				result = 1;
 			}
+#endif
 		}
 		idx++;
 			
