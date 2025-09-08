@@ -15,11 +15,13 @@
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 #include "main.h"
-#include "audio.h"
 #include "st7789_fbdev.h"
 #include "gfx.h"
 #include "encoder.h"
 #include "adc.h"
+#include "codec_nau88c22.h"
+#include "audio.h"
+#include "menu.h"
 
 /* version */
 const char *swVersionStr = "V0.1";
@@ -331,7 +333,11 @@ int main(int argc, char **argv)
 	gfx_set_forecolor(GFX_WHITE);
 	gfx_set_txtscale(2);
 	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2, "DSPOD");
-	
+	gfx_set_txtscale(1);
+	sprintf(textbuf, "Version %s", swVersionStr);
+	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2+16, textbuf);
+	sprintf(textbuf, "%s %s", bdate, btime);
+	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2+32, textbuf);
 	ST7789_fbdev_setBacklight(1);
 	
 	if(verbose)
@@ -359,6 +365,18 @@ int main(int argc, char **argv)
 	
 	if(verbose)
 		printf("ADC initialized\n");
+
+	if(codec_nau88c22(verbose, 1, 0, 0))
+	{
+		fprintf(stderr, "Error initializing codec\n");
+		adc_deinit();
+		encoder_deinit();
+		ST7789_fbdev_deinit();
+		exit(1);
+	}
+	
+	if(verbose)
+		printf("Codec initialized\n");
 
 	/* set up audio processing */
     samples  = sample_rate * dlytime;
@@ -415,6 +433,17 @@ int main(int argc, char **argv)
 	/* allocate the audio buffer */
 	rdbuf = (char *)malloc(buffer_size);
 		
+	/* wait for splash */
+	if(verbose)
+		fprintf(stderr, "Splash delay.\n");
+	sleep(1);
+	
+	/* init the menu system */
+	menu_init();
+	
+	if(verbose)
+		fprintf(stderr, "Menu intialized.\n");
+    
 	/* prepare for use */
 	snd_pcm_prepare(capture_handle);
 	snd_pcm_prepare(playback_handle);
@@ -431,6 +460,8 @@ int main(int argc, char **argv)
 	iret = pthread_create(&audio_thread, NULL, audio_thread_handler, NULL);
 	if(!iret)
 	{	
+
+
 		/* wait for ^C */
 		while(!exit_program)
 		{

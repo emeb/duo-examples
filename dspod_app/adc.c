@@ -17,6 +17,15 @@ static int adcfd;
  */
 int8_t adc_init(char *device)
 {
+	/* load the kernel module (if not already) */
+	if(system("lsmod | grep -q \"cv180x_saradc\"") == 0)
+	{
+		fprintf(stderr, "SARADC module already loaded.\n");
+	}else{
+		system("insmod cv180x_saradc.ko 2>/dev/null");
+		fprintf(stderr, "SARADC module loaded.\n");
+	}
+
 	/* open the ADC device */
 	adcfd = open (device, O_RDWR);
 	if(adcfd < 0)
