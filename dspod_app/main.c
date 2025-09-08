@@ -5,6 +5,7 @@
 
 #if 1
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
@@ -54,6 +55,8 @@ char				*rdbuf;
 unsigned int		fragments = 2;
 int					frame_size;
 snd_pcm_uframes_t   frames, inframes, outframes;
+uint16_t			adc_buffer[4];
+uint8_t				adc_idx;
 
 /*
  * set up an audio device
@@ -166,6 +169,30 @@ void handle_signals(int s)
 }
 
 /*
+ * adc thread
+ */
+void *adc_thread_handler(void *ptr)
+{
+	/* processing loop */
+	fprintf(stderr, "Starting ADC thread\n");
+	adc_idx = 0;
+	while(!exit_program)
+	{
+		/* set mux */
+		adc_set_chl(adc_idx, 1);
+		
+		/* trigger conversion & get value */
+		adc_buffer[adc_idx] = adc_get_value();
+		
+		/* update channel */
+		adc_idx = (adc_idx + 1) & 3;
+		
+		/* wait 5ms for total update rate of 50Hz */
+		usleep(5000);
+	}
+}
+
+/*
  * audio thread
  */
 void *audio_thread_handler(void *ptr)
@@ -216,7 +243,7 @@ void *audio_thread_handler(void *ptr)
  */
 int main(int argc, char **argv)
 {
-	pthread_t audio_thread;
+	pthread_t adc_thread, audio_thread;
 	extern char *optarg;
 	int opt;
 	struct sigaction sigIntHandler;
@@ -455,13 +482,25 @@ int main(int argc, char **argv)
 	for(i = 0; i < fragments; i += 1)
 		snd_pcm_writei(playback_handle, rdbuf, frames);
 	
+	/* start ADC sampling thread */
+	iret = pthread_create(&adc_thread, NULL, adc_thread_handler, NULL);
+	if(iret)
+	{
+		fprintf(stderr, "main: error creating ADC thread\n");
+		adc_deinit();
+		encoder_deinit();
+		ST7789_fbdev_deinit();
+		exit(1);
+	}
+
+	if(verbose)
+		fprintf(stderr, "ADC thread started.\n");
+    
 	/* start audio thread */
 	fprintf(stderr, "main: starting audio thread...\n");
 	iret = pthread_create(&audio_thread, NULL, audio_thread_handler, NULL);
 	if(!iret)
 	{	
-
-
 		/* wait for ^C */
 		while(!exit_program)
 		{
@@ -471,9 +510,14 @@ int main(int argc, char **argv)
             /* print some status */
             if(verbose)
                 Audio_Status();
-            
+			
+			printf("% 5d % 5d % 5d % 5d \r", adc_buffer[0], adc_buffer[1], adc_buffer[2], adc_buffer[3]);
+            fflush(stdout);
 		}
 		fprintf(stderr, "main: finishing...\n");
+		
+		pthread_join(adc_thread, NULL);
+		fprintf(stderr, "main: ADC thread joined...\n");
 		
 		pthread_join(audio_thread, NULL);
 		fprintf(stderr, "main: audio thread joined...\n");
