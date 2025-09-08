@@ -45,20 +45,22 @@ int main(){
 	unsigned long time_in_micros;
 	int i;
 	
-	for(i=0;i<1024;i++){
-		lseek(fd, 0, SEEK_SET);
-		len = read(fd, buffer, sizeof(buffer)-1);
-		if(len != 0){
-			buffer[len] = 0;
-			adc_value = atoi(buffer);
-			gettimeofday(&tv,NULL);
-			time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-			data[i][0] = adc_value;
-			data[i][1] = time_in_micros;
-			//printf("%8d -- ADC%c value is [%s] len %d = %d\n", time_in_micros, adc_channel, buffer, len, adc_value);	
+	//while(1){
+		for(i=0;i<1024;i++){
+			lseek(fd, 0, SEEK_SET);
+			len = read(fd, buffer, sizeof(buffer)-1);
+			if(len != 0){
+				buffer[len] = 0;
+				adc_value = atoi(buffer);
+				gettimeofday(&tv,NULL);
+				time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+				data[i][0] = adc_value;
+				data[i][1] = time_in_micros;
+				//printf("%8d -- ADC%c value is [%s] len %d = %d\n", time_in_micros, adc_channel, buffer, len, adc_value);	
+			}
+			//sleep(1);
 		}
-		//sleep(1);
-	}
+	//}
 	close(fd);
 	for(i=1;i<1024;i++)
 		printf("%8d:%5d\n", data[i][0], data[i][1]-data[i-1][1]);	
