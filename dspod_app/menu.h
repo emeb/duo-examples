@@ -6,6 +6,7 @@
 #ifndef __menu__
 #define __menu__
 
+void menu_splash(const char *swVersionStr, const char *bdate, const char *btime);
 void menu_init(void);
 void menu_process(void);
 

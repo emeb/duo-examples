@@ -273,8 +273,6 @@ int main(int argc, char **argv)
 	float amp = 0.6F, freq = 1000.0F;
 	int iret;
     uint64_t samples;
-	GFX_RECT rect;
-	char textbuf[32];
 	int16_t val = 0;
 	uint8_t btn = 0;
 
@@ -373,26 +371,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Couldn't init graphics lib\n");
 		exit(1);
 	}
-	rect.x0 = 2;
-	rect.y0 = 2;
-	rect.x1 = 317;
-	rect.y1 = 167;
-	gfx_fillroundedrect(&rect, 20);
-	rect.x0 = 40;
-	rect.y0 = 40;
-	rect.x1 = 279;
-	rect.y1 = 130;
-	gfx_set_forecolor(GFX_BLUE);
-	gfx_fillroundedrect(&rect, 20);
-	gfx_set_backcolor(GFX_BLUE);
-	gfx_set_forecolor(GFX_WHITE);
-	gfx_set_txtscale(2);
-	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2, "DSPOD");
-	gfx_set_txtscale(1);
-	sprintf(textbuf, "Version %s", swVersionStr);
-	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2+16, textbuf);
-	sprintf(textbuf, "%s %s", bdate, btime);
-	gfx_drawstrctr((rect.x0+rect.x1)/2, (rect.y0+rect.y1)/2+32, textbuf);
+	menu_splash(swVersionStr, bdate, btime);
 	ST7789_fbdev_setBacklight(1);
 	
 	if(verbose)
@@ -539,13 +518,6 @@ int main(int argc, char **argv)
 			
 			/* handle the menu */
 			menu_process();
-			
-            /* print some status */
-            if(verbose)
-                Audio_Status();
-			
-			printf("% 5d % 5d % 5d % 5d \r", adc_buffer[0], adc_buffer[1], adc_buffer[2], adc_buffer[3]);
-            fflush(stdout);
 		}
 		fprintf(stderr, "main: finishing...\n");
 		

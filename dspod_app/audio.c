@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/time.h>
 #include "main.h"
 #include "audio.h"
 
@@ -35,6 +36,7 @@ uint8_t init, fadest, pt;
 int32_t frq, phs;
 int16_t sinetab[1024];
 int16_t audio_sl[4];
+uint64_t audio_load[3];
 
 /*
  * sine waveform interp
@@ -63,6 +65,9 @@ int32_t Audio_Init(uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
 {
 	if(verbose)
 		fprintf(stderr, "Audio_Init: proc = %d\n", proc_typ);
+	
+	/* audio load calcs */
+	audio_load[0] = audio_load[1] = audio_load[2] = 0;
 	
 	/* NCO */
 	phs = 0;
@@ -129,10 +134,12 @@ void Audio_Process(char *rdbuf, int inframes)
 	uint16_t index;
     int32_t tmpscl;
     uint8_t chl;
+	struct timeval tv;
 	
-    for(index=0;index<inframes;index++)
-	{
-	}
+	/* get entry time */
+	gettimeofday(&tv,NULL);
+	audio_load[2] = audio_load[0];
+	audio_load[0] = 1000000 * tv.tv_sec + tv.tv_usec;
 	
 	/* process I2S data */
 	for(index=0;index<inframes;index++)
@@ -213,13 +220,31 @@ void Audio_Process(char *rdbuf, int inframes)
 		level_calc(*(dst-2), &audio_sl[2]);
 		level_calc(*(dst-1), &audio_sl[3]);
 	}
+	
+	/* get exit time */
+	gettimeofday(&tv,NULL);
+	audio_load[1] = 1000000 * tv.tv_sec + tv.tv_usec;
 }
 
 /*
- * print status
+ * get cpu loading
  */
-void Audio_Status(void)
+uint8_t Audio_get_load(void)
 {
+	uint64_t period = audio_load[0] - audio_load[2];
+	uint64_t duration = audio_load[1] - audio_load[0];
+	uint64_t load = 0;
+	
+	/* update load indicator */
+	if(period != 0)
+	{
+		load = 100*duration/period;
+	}
+	
+	fprintf(stdout, "Load: % 6llu / % 6llu = % 3llu%% \r", duration, period, load);
+	fflush(stdout);
+	
+	return load;
 }
 
 /*
