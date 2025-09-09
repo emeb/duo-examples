@@ -140,9 +140,9 @@ void gfx_clrpixel(GFX_POINT pixel)
 }
 
 /*
- * fill a rectangle with color
+ * fill a rectangle with raw color with inversion checking
  */
-void gfx_colorrect(GFX_RECT *rect, GFX_COLOR color)
+static void gfx_rawcolorrect(GFX_RECT *rect, uint16_t rawcolor)
 {
 	/* check for inversion */
 	if(rect->x0 > rect->x1)
@@ -150,10 +150,18 @@ void gfx_colorrect(GFX_RECT *rect, GFX_COLOR color)
 	if(rect->y0 > rect->y1)
 		gfx_swap(&rect->y0, &rect->y1);
 	
-	uint16_t rawcolor = gfxdrv->Color565(color);
-
 	gfxdrv->fillRect(rect->x0, rect->y0, rect->x1-rect->x0+1, rect->y1-rect->y0+1,
 		rawcolor);
+}
+
+/*
+ * fill a rectangle with color
+ */
+void gfx_colorrect(GFX_RECT *rect, GFX_COLOR color)
+{	
+	uint16_t rawcolor = gfxdrv->Color565(color);
+
+	gfx_rawcolorrect(rect, rawcolor);
 }
 
 /*
@@ -161,7 +169,7 @@ void gfx_colorrect(GFX_RECT *rect, GFX_COLOR color)
  */
 void gfx_fillrect(GFX_RECT *rect)
 {
-	gfx_colorrect(rect, forecolor);
+	gfx_rawcolorrect(rect, forecolor);
 }
 
 /*
@@ -169,7 +177,7 @@ void gfx_fillrect(GFX_RECT *rect)
  */
 void gfx_clrrect(GFX_RECT *rect)
 {
-	gfx_colorrect(rect, backcolor);
+	gfx_rawcolorrect(rect, backcolor);
 }
 
 /*

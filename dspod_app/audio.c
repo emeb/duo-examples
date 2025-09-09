@@ -15,7 +15,7 @@
 #define FADE_BITS 11
 #define FADE_MAX ((1<<FADE_BITS)-1)
 
-#define NUM_PT 3
+#define NUM_PT 4
 #define WAV_PHS 10
 #define WAV_LEN (1<<WAV_PHS)
 #define INTERP_BITS 10
@@ -34,6 +34,7 @@ int32_t gain;
 uint8_t init, fadest, pt;
 int32_t frq, phs;
 int16_t sinetab[1024];
+int16_t audio_sl[4];
 
 /*
  * sine waveform interp
@@ -60,6 +61,9 @@ int16_t sine_interp(uint32_t phs)
  */
 int32_t Audio_Init(uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
 {
+	if(verbose)
+		fprintf(stderr, "Audio_Init: proc = %d\n", proc_typ);
+	
 	/* NCO */
 	phs = 0;
 	frq = (int32_t)floorf(freq * powf(2.0F, 32.0F) / 48000.0F);
@@ -102,6 +106,19 @@ void Audio_Close(void)
 }
 
 /*
+ * signal level calc
+ */
+void level_calc(int16_t sig, int16_t *level)
+{
+	/* rectify */
+	sig = (sig < 0) ? -sig : sig;
+
+	/* peak hold - externally reset */
+	if(*level < sig)
+		*level = sig;
+}
+
+/*
  * process the audio
  */
 void Audio_Process(char *rdbuf, int inframes)
@@ -112,10 +129,19 @@ void Audio_Process(char *rdbuf, int inframes)
 	uint16_t index;
     int32_t tmpscl;
     uint8_t chl;
-    
+	
+    for(index=0;index<inframes;index++)
+	{
+	}
+	
 	/* process I2S data */
 	for(index=0;index<inframes;index++)
 	{
+		/* get input signal levels */
+		level_calc(*(src+0), &audio_sl[0]);
+		level_calc(*(src+1), &audio_sl[1]);
+		
+		/* apply chosen effect */
 		if(pt == 2)
 		{
 			/* delayed loopback */
@@ -164,7 +190,7 @@ void Audio_Process(char *rdbuf, int inframes)
 		{
 			/* immediate loopback */
 			for(chl=0;chl<CHLS;chl++)
-				*dst++ = (*src++)*chl;
+				*dst++ = (*src++);
 		}
 		else if(pt==1)
 		{
@@ -182,6 +208,10 @@ void Audio_Process(char *rdbuf, int inframes)
 			*dst++ = -wav;
 			phs += frq;
 		}
+	
+		/* check output levels */
+		level_calc(*(dst-2), &audio_sl[2]);
+		level_calc(*(dst-1), &audio_sl[3]);
 	}
 }
 
@@ -190,4 +220,15 @@ void Audio_Process(char *rdbuf, int inframes)
  */
 void Audio_Status(void)
 {
+}
+
+/*
+ * get audio level for in/out right/left
+ */
+int16_t Audio_get_level(uint8_t idx)
+{
+	idx &= 3;
+	int16_t result = audio_sl[idx];
+	audio_sl[idx] = 0;
+	return result;
 }

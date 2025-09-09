@@ -8,10 +8,11 @@
 
 #include <stdint.h>
 #include <math.h>
+#include "gfx.h"
 
 extern int sample_rate;
 extern int exit_program;
 extern int verbose;
-void mixer_set(long vol);
+extern int16_t adc_buffer[4];
 
 #endif

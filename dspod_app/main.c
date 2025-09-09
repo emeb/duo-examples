@@ -4,7 +4,6 @@
  */
 
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
@@ -16,7 +15,6 @@
 #include <pthread.h>
 #include "main.h"
 #include "st7789_fbdev.h"
-#include "gfx.h"
 #include "encoder.h"
 #include "adc.h"
 #include "codec_nau88c22.h"
@@ -57,6 +55,7 @@ snd_pcm_uframes_t   frames, inframes, outframes;
 float				adc_iir[4];
 int16_t				adc_buffer[4];
 uint8_t				adc_idx;
+int					verbose = 0;
 
 /*
  * set up an audio device
@@ -270,7 +269,7 @@ int main(int argc, char **argv)
 	extern char *optarg;
 	int opt;
 	struct sigaction sigIntHandler;
-	int i, codec = 0, verbose = 0, proc = 0;
+	int i, codec = 0, proc = 0;
 	float amp = 0.6F, freq = 1000.0F;
 	int iret;
     uint64_t samples;
@@ -537,6 +536,9 @@ int main(int argc, char **argv)
 		{
 			/* wait a bit */
 			usleep(100000);
+			
+			/* handle the menu */
+			menu_process();
 			
             /* print some status */
             if(verbose)
