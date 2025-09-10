@@ -8,13 +8,16 @@
 #include "menu.h"
 #include "widgets.h"
 #include "audio.h"
+#include "encoder.h"
 
 #define MENU_XMAX 319
 #define MENU_YMAX 169
 #define MENU_CV_WIDTH 50
 #define MENU_VU_WIDTH 50
+#define MENU_NUM_ALGO 20
 
 static uint8_t menu_reset;
+static int8_t menu_next_algo, menu_curr_algo;
 
 /*
  * Draw splash screen
@@ -80,6 +83,10 @@ void menu_render(void)
 	/* update dynamic items */
 	sprintf(textbuf, "Load: %2u%% ", Audio_get_load());
 	gfx_drawstr(20, 20, textbuf);
+	
+	/* algo selection */
+	sprintf(textbuf, "Next: %2u   Curr: %2u", menu_next_algo, menu_curr_algo);
+	gfx_drawstr(0, 40, textbuf);
 
 	/* CV indicators */
 	widg_bargraphH(MENU_XMAX/2-5-MENU_CV_WIDTH, 140, MENU_CV_WIDTH, 8, adc_buffer[0]/41);
@@ -109,6 +116,7 @@ void menu_init(void)
 	widg_gradient_init(MENU_VU_WIDTH);
 	
 	menu_reset = 1;
+	menu_curr_algo = menu_next_algo = 0;
 	
 	menu_render();
 }
@@ -118,5 +126,22 @@ void menu_init(void)
  */
 void menu_process(void)
 {
+	int16_t enc_val;
+	uint8_t enc_btn;
+	
+	// detect encoder changes
+	if(encoder_poll(&enc_val, &enc_btn))
+	{
+		menu_next_algo += enc_val;
+		menu_next_algo = menu_next_algo < 0 ? 0 : menu_next_algo;
+		menu_next_algo = menu_next_algo >= MENU_NUM_ALGO ? MENU_NUM_ALGO-1 : menu_next_algo;
+		
+		if(enc_btn)
+		{
+			menu_curr_algo = menu_next_algo;
+		}
+	}
+	
+	// update display
 	menu_render();
 }
