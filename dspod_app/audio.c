@@ -41,6 +41,7 @@ int16_t sinetab[1024];
 int16_t audio_sl[4];
 uint64_t audio_load[3];
 int16_t audio_mute_state, audio_mute_cnt;
+int16_t prev_wet;
 
 /*
  * sine waveform interp
@@ -244,6 +245,7 @@ void Audio_Process(char *rdbuf, int inframes)
 	int16_t *dst = src;
 	uint16_t index;
 	int32_t wet, dry, mix;
+	float live_wet, slope_wet;
 	struct timeval tv;
 	
 	/* get entry time */
@@ -261,18 +263,69 @@ void Audio_Process(char *rdbuf, int inframes)
 	/* apply the effect */
 	fx_proc(prc, src, inframes);
 	
-	/* set W/D mix gain */	
+	/* set W/D mix gain and prep linear interp */
 	wet = adc_buffer[3];
-	dry = 0xfff - wet;
-	
+	live_wet = prev_wet;
+	slope_wet = (float)(wet - prev_wet) / (float)inframes;
+	prev_wet = wet;
+
 	/* W/D mixing and output level detect */
 	for(index=0;index<inframes;index++)
 	{
+		/* linear interp W/D mix gain */
+		wet = live_wet;
+		dry = 0xfff - wet;
+		live_wet += slope_wet;
+		
 		/* W/D with saturation */
 		mix = *prc++ * wet + *src++ * dry;
 		*dst++ = dsp_ssat16(mix>>12);
 		mix = *prc++ * wet + *src++ * dry;
 		*dst++ = dsp_ssat16(mix>>12);
+
+		/* handle muting */
+		switch(audio_mute_state)
+		{
+			case 0:
+				/* pass thru and wait for foreground to force a transition */
+				break;
+			
+			case 1:
+				/* transition to mute state */
+				mix = (*(dst-2) * audio_mute_cnt);
+				*(dst-2) = dsp_ssat16(mix>>9);
+				mix = (*(dst-1) * audio_mute_cnt);
+				*(dst-1) = dsp_ssat16(mix>>9);
+				audio_mute_cnt--;
+				if(audio_mute_cnt == 0)
+					audio_mute_state = 2;
+				break;
+				
+			case 2:
+				/* mute and wait for foreground to force a transition */
+				*(dst-2) = 0;
+				*(dst-1) = 0;
+				break;
+			
+			case 3:
+				/* transition to unmute state */
+				mix = (*(dst-2) * audio_mute_cnt);
+				*(dst-2) = dsp_ssat16(mix>>9);
+				mix = (*(dst-1) * audio_mute_cnt);
+				*(dst-1) = dsp_ssat16(mix>>9);
+				audio_mute_cnt++;
+				if(audio_mute_cnt == 512)
+				{
+					audio_mute_state = 0;
+					audio_mute_cnt = 0;
+				}
+				break;
+				
+			default:
+				/* go to legal state */
+				audio_mute_state = 0;
+				break;
+		}
 
 		/* check output levels */
 		level_calc(*(dst-2), &audio_sl[2]);
@@ -323,7 +376,7 @@ int16_t Audio_get_level(uint8_t idx)
 void Audio_mute(uint8_t enable)
 {
     if(verbose)
-		fprintf(stdout, "audio_mute: start - state = %d, enable = %d", audio_mute_state, enable);
+		fprintf(stdout, "audio_mute: start - state = %d, enable = %d\n", audio_mute_state, enable);
 	
 	if((audio_mute_state == 0) && (enable == 1))
 	{
@@ -343,5 +396,7 @@ void Audio_mute(uint8_t enable)
 			usleep(1000);
 		}
 	}
-    fprintf(stdout, "audio_mute: done");
+	
+    if(verbose)
+		fprintf(stdout, "audio_mute: done\n");
 }

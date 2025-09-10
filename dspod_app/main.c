@@ -509,7 +509,10 @@ int main(int argc, char **argv)
 	fprintf(stderr, "main: starting audio thread...\n");
 	iret = pthread_create(&audio_thread, NULL, audio_thread_handler, NULL);
 	if(!iret)
-	{	
+	{
+		/* unmute */
+		Audio_mute(0);
+		
 		/* wait for ^C */
 		while(!exit_program)
 		{
