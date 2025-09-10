@@ -4,11 +4,13 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
 #include "main.h"
 #include "audio.h"
+#include "dsp_lib.h"
 
 /* stereo or mono */
 #define CHLS 2
@@ -30,6 +32,7 @@ enum fadestate
 
 uint32_t bufsz;
 int16_t *dlybuf, *wptr;
+int16_t *prcbuf;
 uint32_t fadecnt;
 int32_t gain;
 uint8_t init, fadest, pt;
@@ -37,6 +40,7 @@ int32_t frq, phs;
 int16_t sinetab[1024];
 int16_t audio_sl[4];
 uint64_t audio_load[3];
+int16_t audio_mute_state, audio_mute_cnt;
 
 /*
  * sine waveform interp
@@ -61,13 +65,30 @@ int16_t sine_interp(uint32_t phs)
 /*
  * init audio
  */
-int32_t Audio_Init(uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
+int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
 {
 	if(verbose)
 		fprintf(stderr, "Audio_Init: proc = %d\n", proc_typ);
 	
+	/* signal levels */
+	audio_sl[0] = audio_sl[1] = audio_sl[2] = audio_sl[3] = 0;
+	
 	/* audio load calcs */
 	audio_load[0] = audio_load[1] = audio_load[2] = 0;
+	
+	/* Muting */
+	audio_mute_state = 2;	// start up  muted
+	audio_mute_cnt = 0;
+	
+	/* procesing buffer */
+	if(!(prcbuf = malloc(buffer_size)))
+	{
+		fprintf(stderr, "Audio_Init: couldn't allocate processing buffer\n");
+		return 1;
+	}
+	
+	if(verbose)
+		fprintf(stderr, "Audio_Init: allocated %d proc buffer\n", buffer_size);
 	
 	/* NCO */
 	phs = 0;
@@ -90,15 +111,22 @@ int32_t Audio_Init(uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
 	/* delay buffer */
     bufsz = CHLS*dlysamp;
     dlybuf = (int16_t *)malloc(bufsz*sizeof(int16_t));
-    wptr = dlybuf;
+	if(!dlybuf)
+	{
+		fprintf(stderr, "Audio_Init: couldn't allocate delay buffer\n");
+		free(prcbuf);
+		return 1;
+	}
+	
+ 	if(verbose)
+		fprintf(stderr, "Audio_Init: allocated %d delay buffer\n", bufsz);
+	
+	wptr = dlybuf;
     init = 1;
     fadecnt = FADE_MAX;
     fadest =  FADE_IN;
     
-    if(dlybuf)
-        return 0;
-    else
-        return 1;
+	return 0;
 }
 
 /*
@@ -124,30 +152,18 @@ void level_calc(int16_t sig, int16_t *level)
 }
 
 /*
- * process the audio
+ * compute effect on buffers
  */
-void Audio_Process(char *rdbuf, int inframes)
+void fx_proc(int16_t *dst, int16_t *src, uint32_t len)
 {
-	int16_t *src = (int16_t *)rdbuf;
-	int16_t *dst = src;
+	uint32_t index;
 	int16_t tbuf[CHLS];
-	uint16_t index;
     int32_t tmpscl;
     uint8_t chl;
-	struct timeval tv;
-	
-	/* get entry time */
-	gettimeofday(&tv,NULL);
-	audio_load[2] = audio_load[0];
-	audio_load[0] = 1000000 * tv.tv_sec + tv.tv_usec;
 	
 	/* process I2S data */
-	for(index=0;index<inframes;index++)
+	for(index=0;index<len;index++)
 	{
-		/* get input signal levels */
-		level_calc(*(src+0), &audio_sl[0]);
-		level_calc(*(src+1), &audio_sl[1]);
-		
 		/* apply chosen effect */
 		if(pt == 2)
 		{
@@ -215,7 +231,49 @@ void Audio_Process(char *rdbuf, int inframes)
 			*dst++ = -wav;
 			phs += frq;
 		}
+	}
+}
+
+/*
+ * process the audio
+ */
+void Audio_Process(char *rdbuf, int inframes)
+{
+	int16_t *src = (int16_t *)rdbuf;
+	int16_t *prc = (int16_t *)prcbuf;
+	int16_t *dst = src;
+	uint16_t index;
+	int32_t wet, dry, mix;
+	struct timeval tv;
 	
+	/* get entry time */
+	gettimeofday(&tv,NULL);
+	audio_load[2] = audio_load[0];
+	audio_load[0] = 1000000 * tv.tv_sec + tv.tv_usec;
+	
+	/* check input levels */
+	for(index=0;index<inframes;index++)
+	{
+		level_calc(*(src+0), &audio_sl[0]);
+		level_calc(*(src+1), &audio_sl[1]);
+	}
+	
+	/* apply the effect */
+	fx_proc(prc, src, inframes);
+	
+	/* set W/D mix gain */	
+	wet = adc_buffer[3];
+	dry = 0xfff - wet;
+	
+	/* W/D mixing and output level detect */
+	for(index=0;index<inframes;index++)
+	{
+		/* W/D with saturation */
+		mix = *prc++ * wet + *src++ * dry;
+		*dst++ = dsp_ssat16(mix>>12);
+		mix = *prc++ * wet + *src++ * dry;
+		*dst++ = dsp_ssat16(mix>>12);
+
 		/* check output levels */
 		level_calc(*(dst-2), &audio_sl[2]);
 		level_calc(*(dst-1), &audio_sl[3]);
@@ -256,4 +314,34 @@ int16_t Audio_get_level(uint8_t idx)
 	int16_t result = audio_sl[idx];
 	audio_sl[idx] = 0;
 	return result;
+}
+
+/*
+ * internal soft mute - called from foreground context to control muting
+ * blocks until background has completed mute/unmute transition
+ */
+void Audio_mute(uint8_t enable)
+{
+    if(verbose)
+		fprintf(stdout, "audio_mute: start - state = %d, enable = %d", audio_mute_state, enable);
+	
+	if((audio_mute_state == 0) && (enable == 1))
+	{
+		audio_mute_cnt = 512;
+		audio_mute_state = 1;
+		while(audio_mute_state != 2)
+		{
+			usleep(1000);
+		}
+	}
+	else if((audio_mute_state == 2) && (enable == 0))
+	{
+		audio_mute_cnt = 0;
+		audio_mute_state = 3;
+		while(audio_mute_state != 0)
+		{
+			usleep(1000);
+		}
+	}
+    fprintf(stdout, "audio_mute: done");
 }

@@ -13,6 +13,6 @@
 extern int sample_rate;
 extern int exit_program;
 extern int verbose;
-extern int16_t adc_buffer[4];
+extern volatile int16_t adc_buffer[4];
 
 #endif

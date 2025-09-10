@@ -53,7 +53,7 @@ unsigned int		fragments = 2;
 int					frame_size;
 snd_pcm_uframes_t   frames, inframes, outframes;
 float				adc_iir[4];
-int16_t				adc_buffer[4];
+volatile int16_t	adc_buffer[4];
 uint8_t				adc_idx;
 int					verbose = 0;
 
@@ -424,7 +424,7 @@ int main(int argc, char **argv)
 		ST7789_fbdev_deinit();
         exit(1);
     }
-	if(Audio_Init(samples, proc, amp, freq))
+	if(Audio_Init(buffer_size, samples, proc, amp, freq))
     {
 		fprintf(stderr, "Audio Init failed\n");
 		adc_deinit();
