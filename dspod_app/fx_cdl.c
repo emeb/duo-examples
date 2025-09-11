@@ -182,18 +182,18 @@ void fx_cdl_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
 	
 	switch(idx)
 	{
-		case 1:	// Delay
+		case 0:	// Delay
 			ms = (blk->dly<<blk->rng) + 1;
 			ms = ms > blk->len-2 ? blk->len-2 : ms;
 			ms = ms / (SAMPLE_RATE/1000);
 			sprintf(txtbuf, "%6u ms ", ms);
 			break;
 		
-		case 2:	// Feedback
+		case 1:	// Feedback
 			sprintf(txtbuf, "%2d%% ", adc_buffer[idx]/41);
 			break;
 		
-		case 3: // Range
+		case 2: // Range
 			sprintf(txtbuf, "%s ", cd_ranges[blk->rng_raw]);
 			//fx_cdl_Render_Parm(vblk, 1, rect);	// update Delay too
 			break;
@@ -201,7 +201,8 @@ void fx_cdl_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
 		default:
 			return;
 	}
-	gfx_drawstrrect(rect, txtbuf);
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
 }
 
 /*

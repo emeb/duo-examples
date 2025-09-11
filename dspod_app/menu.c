@@ -9,12 +9,12 @@
 #include "widgets.h"
 #include "audio.h"
 #include "encoder.h"
+#include "fx.h"
 
 #define MENU_XMAX 319
 #define MENU_YMAX 169
 #define MENU_CV_WIDTH 50
 #define MENU_VU_WIDTH 50
-#define MENU_NUM_ALGO 20
 
 static uint8_t menu_reset;
 static int8_t menu_next_algo, menu_curr_algo;
@@ -63,9 +63,22 @@ void menu_render(void)
 	{
 		menu_reset = 0;
 		
+		/* current algo name box */
+		gfx_set_forecolor(GFX_BLUE);
+		rect.x0 = MENU_XMAX/2 - 120;
+		rect.y0 = 36;
+		rect.x1 = MENU_XMAX/2 + 120;
+		rect.y1 = 60;
+		gfx_fillroundedrect(&rect, 24);
+		gfx_set_forecolor(GFX_WHITE);
+		gfx_set_backcolor(GFX_BLUE);
+		gfx_set_txtscale(2);
+		sprintf(textbuf, "%2u: %s", fx_get_algo(), fx_get_curr_algo_name());
+		gfx_drawstrctr(MENU_XMAX/2, 48, textbuf);
+		gfx_set_txtscale(1);
+
 		/* set constants */
 		gfx_set_backcolor(GFX_DGRAY);
-		gfx_set_forecolor(GFX_WHITE);
 		
 		/* CV indicators */
 		gfx_drawstr(MENU_XMAX/2-MENU_CV_WIDTH-6-16, 141, "C0");
@@ -80,14 +93,25 @@ void menu_render(void)
 		gfx_drawstr(MENU_XMAX-10-16, 151, "or");
 	}
 	
+#if 1
 	/* update dynamic items */
 	sprintf(textbuf, "Load: %2u%% ", Audio_get_load());
-	gfx_drawstr(20, 20, textbuf);
+	gfx_drawstr(10, 4, textbuf);
 	
-	/* algo selection */
-	sprintf(textbuf, "Next: %2u   Curr: %2u", menu_next_algo, menu_curr_algo);
-	gfx_drawstr(0, 40, textbuf);
-
+	/* update algo params */
+	gfx_set_backcolor(GFX_DGRAY);
+	gfx_set_txtscale(1);
+	for(i=0;i<3;i++)
+	{
+		//menu_item_values[menu_algo][i] = adc_buffer[i];
+		fx_render_parm(i);
+	}
+	
+	/* update W/D mix param */
+	gfx_drawstrctr((240+319)/2, 129-16, "W/D Mix");
+	sprintf(textbuf, "%2d%% ", adc_buffer[3]/41);
+	gfx_drawstrctr((240+319)/2, 129-6, textbuf);
+	
 	/* CV indicators */
 	widg_bargraphH(MENU_XMAX/2-5-MENU_CV_WIDTH, 140, MENU_CV_WIDTH, 8, adc_buffer[0]/41);
 	widg_bargraphH(MENU_XMAX/2-5-MENU_CV_WIDTH, 150, MENU_CV_WIDTH, 8, adc_buffer[1]/41);
@@ -99,7 +123,7 @@ void menu_render(void)
 	widg_bargraphHG(30, 150, MENU_VU_WIDTH, 8, Audio_get_level(1)/328);
 	widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 140, MENU_VU_WIDTH, 8, Audio_get_level(2)/328);
 	widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 150, MENU_VU_WIDTH, 8, Audio_get_level(3)/328);
-	
+#endif
 }
 
 /*
@@ -128,17 +152,49 @@ void menu_process(void)
 {
 	int16_t enc_val;
 	uint8_t enc_btn;
+	GFX_RECT rect;
+	char textbuf[32];
 	
 	// detect encoder changes
 	if(encoder_poll(&enc_val, &enc_btn))
 	{
-		menu_next_algo += enc_val;
-		menu_next_algo = menu_next_algo < 0 ? 0 : menu_next_algo;
-		menu_next_algo = menu_next_algo >= MENU_NUM_ALGO ? MENU_NUM_ALGO-1 : menu_next_algo;
+		if(enc_val)
+		{
+			menu_next_algo += enc_val;
+			menu_next_algo = menu_next_algo < 0 ? 0 : menu_next_algo;
+			menu_next_algo = menu_next_algo >= FX_NUM_ALGOS ? FX_NUM_ALGOS-1 : menu_next_algo;
+		
+			/* next algo box */
+			gfx_set_forecolor(GFX_MAGENTA);
+			rect.x0 = MENU_XMAX/2 - 60;
+			rect.y0 = 16;
+			rect.x1 = MENU_XMAX/2 + 60;
+			rect.y1 = 32;
+			gfx_fillroundedrect(&rect, 16);
+			
+			/* algo selection */
+			gfx_set_forecolor(GFX_WHITE);
+			gfx_set_backcolor(GFX_MAGENTA);
+			sprintf(textbuf, "%2u: %s", menu_next_algo, fx_get_algo_name(menu_next_algo));
+			gfx_drawstrctr(MENU_XMAX/2, 24, textbuf);
+			gfx_set_backcolor(GFX_DGRAY);
+		}
 		
 		if(enc_btn)
 		{
+			/* erase next algo box */
+			gfx_set_forecolor(GFX_DGRAY);
+			rect.x0 = MENU_XMAX/2 - 60;
+			rect.y0 = 16;
+			rect.x1 = MENU_XMAX/2 + 60;
+			rect.y1 = 32;
+			gfx_fillrect(&rect);
+			gfx_set_forecolor(GFX_WHITE);
+			
+			/* update current algo & redraw */
+			menu_reset = 1;
 			menu_curr_algo = menu_next_algo;
+			fx_select_algo(menu_next_algo);
 		}
 	}
 	

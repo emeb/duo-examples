@@ -32,9 +32,9 @@ uint8_t fx_algo;
 
 const char *bypass_param_names[] =
 {
-	"",
-	"",
-	"",
+	"CV1",
+	"CV2",
+	"CV3",
 };
 
 /*
@@ -77,8 +77,9 @@ void fx_bypass_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
 	if(idx > 2)
 		return;
 
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
 	sprintf(txtbuf, "%2d%% ", adc_buffer[idx]/41);
-	gfx_drawstrrect(rect, txtbuf);
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
 }
 
 /*
@@ -113,31 +114,33 @@ const fx_struct *effects[FX_NUM_ALGOS] = {
  */
 uint8_t fx_init(void)
 {
-	/* allocate 32kB internal buffer memory */
-	fx_mem = malloc(FX_MAX_MEM);
+	/* allocate 129kB internal buffer memory */
+	fx_int_sz = FX_MAX_MEM;
+	fx_mem = malloc(fx_int_sz);
 	if(fx_mem)
 	{	
 		if(verbose)
-			fprintf(stderr, "fx_init: %d bytes internal reserved for audio", FX_MAX_MEM);
+			fprintf(stderr, "fx_init: %d bytes internal reserved for audio\n", fx_int_sz);
 	}
 	else
 	{
 		if(verbose)
-			fprintf(stderr, "fx_init: Failed getting %d bytes internal for audio", FX_MAX_MEM);
+			fprintf(stderr, "fx_init: Failed getting %d bytes internal for audio\n", fx_int_sz);
 		return 1;
 	}
 	
-	/* allocate ~2MB external buffer memory */
+	/* allocate 16MB external buffer memory */
+	fx_ext_sz = FX_EXT_MEM;
 	fx_ext_buffer = malloc(fx_ext_sz);
 	if(fx_ext_buffer)
 	{
 		if(verbose)
-			fprintf(stderr, "fx_init: %d bytes available for audio buffers", fx_ext_sz);
+			fprintf(stderr, "fx_init: %d bytes available for audio buffers\n", fx_ext_sz);
 	}
 	else
 	{
 		if(verbose)
-			fprintf(stderr, "fx_init: Failed getting %d bytes for audio buffers", fx_ext_sz);
+			fprintf(stderr, "fx_init: Failed getting %d bytes for audio buffers\n", fx_ext_sz);
 		
 		free(fx_mem);
 		return 1;
@@ -210,9 +213,17 @@ uint8_t fx_get_num_parms(void)
 }
 
 /*
- * get name of effect
+ * get name of any effect
  */
-char * fx_get_algo_name(void)
+char * fx_get_algo_name(uint8_t algo_num)
+{
+	return (char *)effects[algo_num]->name;
+}
+
+/*
+ * get name of current effect
+ */
+char * fx_get_curr_algo_name(void)
 {
 	return (char *)effects[fx_algo]->name;
 }
@@ -230,16 +241,19 @@ char * fx_get_parm_name(uint8_t idx)
  */
 void fx_render_parm(uint8_t idx)
 {
-	size_t nchar = strlen(effects[fx_algo]->parm_names[idx-1]);
+	char *pname = fx_get_parm_name(idx);
+	size_t nchar = strlen(pname);
 	
+	/* if param has a name it will be rendered */
 	if(nchar)
 	{
+		/* four 80x80 rects spaced across the display */
 		GFX_RECT rect =
 		{
-			.x0 = 41 + 8*(nchar + 1),
-			.y0 = idx*10+10+80,
-			.x1 = 158,
-			.y1 = rect.y0+7
+			.x0 = idx*80,
+			.y0 = 70,
+			.x1 = idx*80 + 79,
+			.y1 = 129
 		};
 		
 		effects[fx_algo]->render_parm(fx, idx, &rect);

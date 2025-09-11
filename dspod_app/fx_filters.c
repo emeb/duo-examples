@@ -105,13 +105,14 @@ void fx_filters_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
 			break;
 		
 		case 1:	// Resonance
-			sprintf(txtbuf, "%2d%% ", adc_buffer[idx]/41);
+			sprintf(txtbuf, "%2d%% ", adc_buffer[1]/41);
 			break;
 		
 		default:
 			return;
 	}
-	gfx_drawstrrect(rect, txtbuf);
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
+	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
 }
 
 /*
