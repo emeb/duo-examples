@@ -11,6 +11,7 @@
 #include "main.h"
 #include "audio.h"
 #include "dsp_lib.h"
+#include "fx.h"
 
 /* stereo or mono */
 #define CHLS 2
@@ -44,32 +45,25 @@ int16_t audio_mute_state, audio_mute_cnt;
 int16_t prev_wet;
 
 /*
- * sine waveform interp
- */
-int16_t sine_interp(uint32_t phs)
-{
-	
-	int32_t a, b, sum;
-	uint32_t ip, fp;
-	
-	ip = phs>>(32-WAV_PHS);
-	a = sinetab[ip];
-	b = sinetab[(ip + 1)&(WAV_LEN-1)];
-	
-	fp = (phs & ((1<<(32-WAV_PHS))-1)) >> ((32-WAV_PHS)-INTERP_BITS);
-	sum = b * fp;
-	sum += a * (((1<<INTERP_BITS)-1)-fp);
-	
-	return sum >> INTERP_BITS; 
-}
-
-/*
  * init audio
  */
 int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
 {
 	if(verbose)
 		fprintf(stderr, "Audio_Init: proc = %d\n", proc_typ);
+	
+	/* init fx */
+	if(fx_init())
+	{
+		if(verbose)
+			fprintf(stderr, "Audio_Init: fx_init() failed\n");
+		return 1;
+	}
+	else
+	{
+		if(verbose)
+			fprintf(stderr, "Audio_Init: fx_init() OK\n");
+	}
 	
 	/* signal levels */
 	audio_sl[0] = audio_sl[1] = audio_sl[2] = audio_sl[3] = 0;
@@ -85,12 +79,14 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
 	if(!(prcbuf = malloc(buffer_size)))
 	{
 		fprintf(stderr, "Audio_Init: couldn't allocate processing buffer\n");
+		fx_deinit();
 		return 1;
 	}
 	
 	if(verbose)
 		fprintf(stderr, "Audio_Init: allocated %d proc buffer\n", buffer_size);
 	
+#if 0
 	/* NCO */
 	phs = 0;
 	frq = (int32_t)floorf(freq * powf(2.0F, 32.0F) / 48000.0F);
@@ -102,6 +98,7 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
 		sinetab[i] = floorf(32767.0F * sinf(th) + 0.5F);
 		th += thinc;
 	}
+#endif
 	
 	/* processing type */
 	pt = proc_typ%NUM_PT;
@@ -116,6 +113,7 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
 	{
 		fprintf(stderr, "Audio_Init: couldn't allocate delay buffer\n");
 		free(prcbuf);
+		fx_deinit();
 		return 1;
 	}
 	
@@ -150,6 +148,27 @@ void level_calc(int16_t sig, int16_t *level)
 	/* peak hold - externally reset */
 	if(*level < sig)
 		*level = sig;
+}
+
+#if 0
+/*
+ * sine waveform interp
+ */
+int16_t sine_interp(uint32_t phs)
+{
+	
+	int32_t a, b, sum;
+	uint32_t ip, fp;
+	
+	ip = phs>>(32-WAV_PHS);
+	a = sinetab[ip];
+	b = sinetab[(ip + 1)&(WAV_LEN-1)];
+	
+	fp = (phs & ((1<<(32-WAV_PHS))-1)) >> ((32-WAV_PHS)-INTERP_BITS);
+	sum = b * fp;
+	sum += a * (((1<<INTERP_BITS)-1)-fp);
+	
+	return sum >> INTERP_BITS; 
 }
 
 /*
@@ -234,6 +253,7 @@ void fx_proc(int16_t *dst, int16_t *src, uint32_t len)
 		}
 	}
 }
+#endif
 
 /*
  * process the audio
