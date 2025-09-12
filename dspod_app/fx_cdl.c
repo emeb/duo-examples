@@ -174,35 +174,72 @@ void fx_cd_common_Proc(void *vblk, int16_t *dst, int16_t *src, uint16_t sz)
 /*
  * Render parameter for clean delay - either delay in ms or feedback %
  */
-void fx_cdl_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
+void fx_cdl_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect, uint8_t init)
 {
 	fx_cdl_blk *blk = vblk;
 	char txtbuf[32];
 	uint32_t ms;
+	static uint32_t prev_ms = 0;
+	uint8_t update = 0;
+	static int16_t prev_fb = -1;
+	int16_t fb;
+	static uint8_t prev_rng = 255;
 	
-	switch(idx)
+	if(init)
 	{
-		case 0:	// Delay
-			ms = (blk->dly<<blk->rng) + 1;
-			ms = ms > blk->len-2 ? blk->len-2 : ms;
-			ms = ms / (SAMPLE_RATE/1000);
-			sprintf(txtbuf, "%6u ms ", ms);
-			break;
-		
-		case 1:	// Feedback
-			sprintf(txtbuf, "%2d%% ", adc_buffer[idx]/41);
-			break;
-		
-		case 2: // Range
-			sprintf(txtbuf, "%s ", cd_ranges[blk->rng_raw]);
-			//fx_cdl_Render_Parm(vblk, 1, rect);	// update Delay too
-			break;
-		
-		default:
-			return;
+		/* clear param region and update param name */
+		gfx_clrrect(rect);
+		gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
+		prev_ms = 0;
+		prev_fb = -1;
+		prev_rng = 255;
 	}
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+	else
+	{
+		/* update param value */
+		switch(idx)
+		{
+			case 0:	// Delay
+				ms = (blk->dly<<blk->rng) + 1;
+				ms = ms > blk->len-2 ? blk->len-2 : ms;
+				ms = ms / (SAMPLE_RATE/1000);
+				if(ms != prev_ms)
+				{
+					sprintf(txtbuf, "%6u ms ", ms);
+					prev_ms = ms;
+					update = 1;
+				}
+				break;
+			
+			case 1:	// Feedback
+				fb = adc_buffer[idx]/41;
+				if(fb != prev_fb)
+				{
+					sprintf(txtbuf, "%2d%% ", fb);
+					prev_fb = fb;
+					update = 1;
+				}
+				break;
+			
+			case 2: // Range
+				if(blk->rng_raw != prev_rng)
+				{
+					sprintf(txtbuf, " %s ", cd_ranges[blk->rng_raw]);
+					prev_rng = blk->rng_raw;
+					update = 1;
+				}
+				//fx_cdl_Render_Parm(vblk, 1, rect);	// update Delay too
+				break;
+			
+			default:
+				return;
+		}
+		
+		if(update)
+		{
+			gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+		}
+	}
 }
 
 /*

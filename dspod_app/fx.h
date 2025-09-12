@@ -37,14 +37,14 @@ typedef struct
 	void * (*init)(uint32_t *mem);
 	void (*cleanup)(void *blk);
 	void (*proc)(void *blk, int16_t *dst, int16_t *src, uint16_t sz);
-	void (*render_parm)(void *blk, uint8_t idx, GFX_RECT *rect);
+	void (*render_parm)(void *blk, uint8_t idx, GFX_RECT *rect, uint8_t init);
 } fx_struct;
 
 /* array of ptrs to effects structs */
 extern const fx_struct *effects[FX_NUM_ALGOS];
 
 void fx_bypass_Cleanup(void *dummy);
-void fx_bypass_Render_Parm(void *blk, uint8_t idx, GFX_RECT *rect);
+void fx_bypass_Render_Parm(void *blk, uint8_t idx, GFX_RECT *rect, uint8_t init);
 
 uint8_t fx_init(void);
 uint8_t fx_deinit(void);
@@ -55,7 +55,7 @@ uint8_t fx_get_num_parms(void);
 char * fx_get_algo_name(uint8_t algo_num);
 char * fx_get_curr_algo_name(void);
 char * fx_get_parm_name(uint8_t idx);
-void fx_render_parm(uint8_t idx);
+void fx_render_parm(uint8_t idx, uint8_t init);
 
 #endif
 

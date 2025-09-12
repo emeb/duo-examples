@@ -50,6 +50,69 @@ void menu_splash(const char *swVersionStr, const char *bdate, const char *btime)
 }
 
 /*
+ * display CPU load on change
+ */
+void menu_show_cpuload(void)
+{
+	static uint8_t prev_load = 255;
+	uint8_t curr_load = Audio_get_load();
+	char textbuf[32];
+	
+	if(curr_load != prev_load)
+	{
+		sprintf(textbuf, "Load: %2u%% ", curr_load);
+		gfx_drawstr(10, 4, textbuf);
+		prev_load = curr_load;
+	}
+}
+
+/* CV bargraph coords */
+int16_t cv_coords[] =
+{
+	MENU_XMAX/2-5-MENU_CV_WIDTH, 140,
+	MENU_XMAX/2-5-MENU_CV_WIDTH, 150,
+	MENU_XMAX/2+5, 140,
+	MENU_XMAX/2+5, 150,
+};
+
+/*
+ * render CV indicators on change
+ */
+void menu_render_cvs(void)
+{
+	static int16_t prev_cv[4];
+	int16_t curr_cv, i;
+	
+	for(i=0;i<4;i++)
+	{
+		curr_cv = adc_buffer[i]/41;
+		if(curr_cv != prev_cv[i])
+		{
+			widg_bargraphH(cv_coords[2*i], cv_coords[2*i+1], MENU_CV_WIDTH, 8, curr_cv);		
+			prev_cv[i] = curr_cv;
+		}
+	}
+}
+
+/*
+ * render W/D indicator on change
+ */
+void menu_render_wetdry(void)
+{
+	static int16_t prev_wetdry = -1;
+	int16_t curr_wetdry = adc_buffer[3]/41;
+	char textbuf[32];
+	
+	if(curr_wetdry != prev_wetdry)
+	{
+		gfx_drawstrctr((240+319)/2, 129-16, "W/D Mix");
+		sprintf(textbuf, "%2d%% ", curr_wetdry);
+		gfx_drawstrctr((240+319)/2, 129-6, textbuf);
+		prev_wetdry = curr_wetdry;
+	}
+}
+
+/*
  * redraw the menu
  */
 void menu_render(void)
@@ -57,7 +120,8 @@ void menu_render(void)
 	uint8_t i;
 	GFX_RECT rect;
 	char textbuf[32];
-
+	static int8_t vslice = 0;
+	
 	/* refresh static items */
 	if(menu_reset)
 	{
@@ -80,6 +144,12 @@ void menu_render(void)
 		/* set constants */
 		gfx_set_backcolor(GFX_DGRAY);
 		
+		/* init fx params */
+		for(i=0;i<3;i++)
+		{
+			fx_render_parm(i, 1);
+		}
+		
 		/* CV indicators */
 		gfx_drawstr(MENU_XMAX/2-MENU_CV_WIDTH-6-16, 141, "C0");
 		gfx_drawstr(MENU_XMAX/2-MENU_CV_WIDTH-6-16, 151, "C1");
@@ -93,37 +163,39 @@ void menu_render(void)
 		gfx_drawstr(MENU_XMAX-10-16, 151, "or");
 	}
 	
-#if 1
-	/* update dynamic items */
-	sprintf(textbuf, "Load: %2u%% ", Audio_get_load());
-	gfx_drawstr(10, 4, textbuf);
-	
-	/* update algo params */
-	gfx_set_backcolor(GFX_DGRAY);
-	gfx_set_txtscale(1);
-	for(i=0;i<3;i++)
+	/* divide the updates up into horizontal slices to reduce loading */
+	switch(vslice)
 	{
-		//menu_item_values[menu_algo][i] = adc_buffer[i];
-		fx_render_parm(i);
+		case 0:	// top region
+			/* update dynamic items */
+			menu_show_cpuload();
+			break;
+	
+		case 1:	// center region
+			/* update algo params */
+			gfx_set_backcolor(GFX_DGRAY);
+			gfx_set_txtscale(1);
+			for(i=0;i<3;i++)
+			{
+				fx_render_parm(i, 0);
+			}
+			
+			/* update W/D mix param */
+			menu_render_wetdry();
+			break;
+	
+		case 2:	// bottom region
+			/* CV indicators */
+			menu_render_cvs();
+			
+			/* VU meters */
+			widg_bargraphHG(30, 140, MENU_VU_WIDTH, 8, Audio_get_level(0)/328);
+			widg_bargraphHG(30, 150, MENU_VU_WIDTH, 8, Audio_get_level(1)/328);
+			widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 140, MENU_VU_WIDTH, 8, Audio_get_level(2)/328);
+			widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 150, MENU_VU_WIDTH, 8, Audio_get_level(3)/328);
+			break;
 	}
-	
-	/* update W/D mix param */
-	gfx_drawstrctr((240+319)/2, 129-16, "W/D Mix");
-	sprintf(textbuf, "%2d%% ", adc_buffer[3]/41);
-	gfx_drawstrctr((240+319)/2, 129-6, textbuf);
-	
-	/* CV indicators */
-	widg_bargraphH(MENU_XMAX/2-5-MENU_CV_WIDTH, 140, MENU_CV_WIDTH, 8, adc_buffer[0]/41);
-	widg_bargraphH(MENU_XMAX/2-5-MENU_CV_WIDTH, 150, MENU_CV_WIDTH, 8, adc_buffer[1]/41);
-	widg_bargraphH(MENU_XMAX/2+5, 140, MENU_CV_WIDTH, 8, adc_buffer[2]/41);
-	widg_bargraphH(MENU_XMAX/2+5, 150, MENU_CV_WIDTH, 8, adc_buffer[3]/41);
-	
-	/* VU meters */
-	widg_bargraphHG(30, 140, MENU_VU_WIDTH, 8, Audio_get_level(0)/328);
-	widg_bargraphHG(30, 150, MENU_VU_WIDTH, 8, Audio_get_level(1)/328);
-	widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 140, MENU_VU_WIDTH, 8, Audio_get_level(2)/328);
-	widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 150, MENU_VU_WIDTH, 8, Audio_get_level(3)/328);
-#endif
+	vslice = (vslice + 1) % 3;
 }
 
 /*

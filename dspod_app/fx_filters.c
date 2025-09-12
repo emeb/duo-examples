@@ -91,28 +91,58 @@ void fx_filters_Proc(void *vblk, int16_t *dst, int16_t *src, uint16_t sz)
 /*
  * Render parameter for clean delay - either delay in ms or feedback %
  */
-void fx_filters_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
+void fx_filters_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect, uint8_t init)
 {
 	fx_filter_blk *blk = vblk;
 	char txtbuf[32];
 	float cutoff;
+	static float prev_cutoff = -1.0F;
+	uint8_t update = 0;
+	int16_t res;
+	static int16_t prev_res = -1;
 	
-	switch(idx)
+	if(init)
 	{
-		case 0:	// Cutoff
-			cutoff = ((float)SAMPLE_RATE / 2) * ((float)blk->fc/32768.0F) / 1000.0F;
-			sprintf(txtbuf, "%4.2f kHz ", cutoff);
-			break;
-		
-		case 1:	// Resonance
-			sprintf(txtbuf, "%2d%% ", adc_buffer[1]/41);
-			break;
-		
-		default:
-			return;
+		/* clear param region and update param name */
+		gfx_clrrect(rect);
+		gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
+		prev_cutoff = -1.0F;
+		prev_res = -1;
 	}
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+	else
+	{
+		/* update param value */
+		switch(idx)
+		{
+			case 0:	// Cutoff
+				cutoff = ((float)SAMPLE_RATE / 2) * ((float)blk->fc/32768.0F) / 1000.0F;
+				if(cutoff != prev_cutoff)
+				{
+					sprintf(txtbuf, "%4.2f kHz ", cutoff);
+					prev_cutoff = cutoff;
+					update = 1;
+				}
+				break;
+			
+			case 1:	// Resonance
+				res = adc_buffer[1]/41;
+				if(res != prev_res)
+				{
+					sprintf(txtbuf, "%2d%% ", res);
+					prev_res = res;
+					update = 1;
+				}
+				break;
+			
+			default:
+				return;
+		}
+	
+		if(update)
+		{
+			gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+		}
+	}
 }
 
 /*

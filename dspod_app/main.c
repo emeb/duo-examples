@@ -517,7 +517,7 @@ int main(int argc, char **argv)
 		while(!exit_program)
 		{
 			/* wait a bit */
-			usleep(100000);
+			usleep(33000);
 			
 			/* handle the menu */
 			menu_process();

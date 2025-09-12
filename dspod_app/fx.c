@@ -69,17 +69,38 @@ void fx_bypass_Proc(void *dummy, int16_t *dst, int16_t *src, uint16_t sz)
 /*
  * Bypass render parameter is just simple percentage
  */
-void fx_bypass_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect)
+void fx_bypass_Render_Parm(void *vblk, uint8_t idx, GFX_RECT *rect, uint8_t init)
 {
-	char txtbuf[32];
+	static int16_t prev_val[3] = {-1, -1, -1};
+	int16_t val;
+	char *pname = fx_get_parm_name(idx), txtbuf[32];
 	
 	/* only first 3 ADC values are for general use */
 	if(idx > 2)
 		return;
 
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, fx_get_parm_name(idx));
-	sprintf(txtbuf, "%2d%% ", adc_buffer[idx]/41);
-	gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+	if(init)
+	{
+		/* clear param region and update param name */
+		gfx_clrrect(rect);
+		if(strlen(pname))
+		{
+			gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-16, pname);
+		}
+		prev_val[0] = -1;
+		prev_val[1] = -1;
+		prev_val[2] = -1;
+	}
+	else if(strlen(pname))
+	{
+		val = adc_buffer[idx]/41;
+		if(val != prev_val[idx])
+		{
+			sprintf(txtbuf, "%2d%% ", val);
+			prev_val[idx] = val;
+			gfx_drawstrctr((rect->x0+rect->x1)/2, rect->y1-6, txtbuf);
+		}
+	}
 }
 
 /*
@@ -239,25 +260,20 @@ char * fx_get_parm_name(uint8_t idx)
 /*
  * render parameter parts
  */
-void fx_render_parm(uint8_t idx)
+void fx_render_parm(uint8_t idx, uint8_t init)
 {
 	char *pname = fx_get_parm_name(idx);
-	size_t nchar = strlen(pname);
 	
-	/* if param has a name it will be rendered */
-	if(nchar)
+	/* four 80x80 rects spaced across the display */
+	GFX_RECT rect =
 	{
-		/* four 80x80 rects spaced across the display */
-		GFX_RECT rect =
-		{
-			.x0 = idx*80,
-			.y0 = 70,
-			.x1 = idx*80 + 79,
-			.y1 = 129
-		};
+		.x0 = idx*80,
+		.y0 = 70,
+		.x1 = idx*80 + 79,
+		.y1 = 129
+	};
 		
-		effects[fx_algo]->render_parm(fx, idx, &rect);
-	}
+	effects[fx_algo]->render_parm(fx, idx, &rect, init);
 }
 
 
