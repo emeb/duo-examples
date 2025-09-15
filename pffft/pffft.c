@@ -95,8 +95,7 @@
 
 
 // define PFFFT_SIMD_DISABLE if you want to use scalar code instead of simd code
-#define PFFFT_SIMD_DISABLE
-#warning "Disabling SIMD for RISC-V - not complete yet!\n";
+//#define PFFFT_SIMD_DISABLE
 
 /* select which SIMD intrinsics will be used */
 #if !defined(PFFFT_SIMD_DISABLE)
@@ -201,16 +200,17 @@ typedef float32x4_t v4sf;
 #  include <riscv_vector.h>
 typedef vfloat32m1_t v4sf;
 #  define SIMD_SZ 4
-#  define VZERO() vfmv_v_f_f32m1(0.0f, SIMD_SZ)
-#  define VMUL(a,b) vmulq_f32(a,b)
-#  define VADD(a,b) vaddq_f32(a,b)
-#  define VMADD(a,b,c) vfmacc_vv_f32m1(c, a, b, SIMD_SZ)
-#  define VSUB(a,b) vsubq_f32(a,b)
-#  warning "RISC-V vector detected but\n";
-#  if !defined(PFFFT_SIMD_DISABLE)
-#    warning "building with simd disabled !\n";
-#    define PFFFT_SIMD_DISABLE // fallback to scalar code
-#  endif
+#  define VZERO() vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#  define VMUL(a,b) vfmul_vv_f32m1(a,b,SIMD_SZ)
+#  define VADD(a,b) vfadd_vv_f32m1(a,b,SIMD_SZ)
+#  define VMADD(a,b,c) vfmacc_vv_f32m1(c,a,b,SIMD_SZ)
+#  define VSUB(a,b) vfsub_vv_f32m1(a,b,SIMD_SZ)
+#  define LD_PS1(p) 
+#  define INTERLEAVE2(in1, in2, out1, out2) 
+#  define UNINTERLEAVE2(in1, in2, out1, out2) 
+#  define VTRANSPOSE4(x0,x1,x2,x3) 
+#  define VSWAPHL(a,b) 
+#  define VALIGNED(ptr) ((((size_t)(ptr)) & 0xF) == 0)
 #else
 #  if !defined(PFFFT_SIMD_DISABLE)
 #    warning "building with simd disabled !\n";
