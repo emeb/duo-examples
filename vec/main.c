@@ -39,7 +39,14 @@ static inline float vector_dot_product(const float *a, const float *b, size_t n)
 	return result;
 }
 
-int main() {
+int main()
+{
+#ifdef 	__riscv_v_intrinsic
+	printf("__riscv_v_intrinsic is defined with value %d\n", __riscv_v_intrinsic);
+#else
+	printf("__riscv_v_intrinsic is not defined\n");
+#endif
+	
 	size_t vl = vsetvl_e32m1(8);
 	printf("Test VL: %zu\n", vl);
 	
