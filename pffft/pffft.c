@@ -197,20 +197,25 @@ typedef float32x4_t v4sf;
   RISC-V vector support macros
  */
 #elif defined(PFFFT_SIMD_RISCV)
-#  include <riscv_vector.h>
+#  warning "SIMD not available on RISC-V!\n";
+#  define PFFFT_SIMD_DISABLE // fallback to scalar code
+#  if 0
+/* RVV dynamically sized types are incompatible with the way pffft is written */
+#   include <riscv_vector.h>
 typedef vfloat32m1_t v4sf;
-#  define SIMD_SZ 4
-#  define VZERO() vfmv_v_f_f32m1(0.0f,SIMD_SZ)
-#  define VMUL(a,b) vfmul_vv_f32m1(a,b,SIMD_SZ)
-#  define VADD(a,b) vfadd_vv_f32m1(a,b,SIMD_SZ)
-#  define VMADD(a,b,c) vfmacc_vv_f32m1(c,a,b,SIMD_SZ)
-#  define VSUB(a,b) vfsub_vv_f32m1(a,b,SIMD_SZ)
-#  define LD_PS1(p) 
-#  define INTERLEAVE2(in1, in2, out1, out2) 
-#  define UNINTERLEAVE2(in1, in2, out1, out2) 
-#  define VTRANSPOSE4(x0,x1,x2,x3) 
-#  define VSWAPHL(a,b) 
-#  define VALIGNED(ptr) ((((size_t)(ptr)) & 0xF) == 0)
+#   define SIMD_SZ 4
+#   define VZERO() vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define VMUL(a,b) vfmul_vv_f32m1(a,b,SIMD_SZ)
+#   define VADD(a,b) vfadd_vv_f32m1(a,b,SIMD_SZ)
+#   define VMADD(a,b,c) vfmacc_vv_f32m1(c,a,b,SIMD_SZ)
+#   define VSUB(a,b) vfsub_vv_f32m1(a,b,SIMD_SZ)
+#   define LD_PS1(p) vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define INTERLEAVE2(in1, in2, out1, out2) vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define UNINTERLEAVE2(in1, in2, out1, out2) vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define VTRANSPOSE4(x0,x1,x2,x3) vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define VSWAPHL(a,b) vfmv_v_f_f32m1(0.0f,SIMD_SZ)
+#   define VALIGNED(ptr) ((((size_t)(ptr)) & 0xF) == 0)
+#  endif
 #else
 #  if !defined(PFFFT_SIMD_DISABLE)
 #    warning "building with simd disabled !\n";
