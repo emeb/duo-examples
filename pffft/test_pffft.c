@@ -275,7 +275,7 @@ void pffft_validate(int cplx) {
 #endif
 }
 
-int array_output_format = 1;
+int array_output_format = 0;
 
 void show_output(const char *name, int N, int cplx, float flops, float t0, float t1, int max_iter) {
   float mflops = flops/1e6/(t1 - t0 + 1e-16);
@@ -285,7 +285,7 @@ void show_output(const char *name, int N, int cplx, float flops, float t0, float
     } else printf("|      n/a   ");
   } else {
     if (flops != -1) {
-      printf("N=%5d, %s %16s : %6.0f MFlops [t=%6.0f ns, %d runs]\n", N, (cplx?"CPLX":"REAL"), name, mflops, (t1-t0)/2/max_iter * 1e9, max_iter);
+      printf("N=%5d, %s %16s : %6.0f MFlops [t=%6.0f ns/xfrm, %d runs]\n", N, (cplx?"CPLX":"REAL"), name, mflops, (t1-t0)/2/max_iter * 1e9, max_iter);
     }
   }
   fflush(stdout);
