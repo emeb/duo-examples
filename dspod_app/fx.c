@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "audio.h"
 #include "fx.h"
 #include "fx_vca.h"
 #include "fx_cdl.h"
@@ -191,8 +192,11 @@ void fx_select_algo(uint8_t algo)
 	uint8_t prev_fx_algo;
 	
 	/* only legal algorithms */
-	if(algo >= FX_NUM_ALGOS)
+	if((algo >= FX_NUM_ALGOS) || (algo == fx_algo))
 		return;
+	
+	/* mute during transition */
+	Audio_mute(1);
 	
 	/* bypass during init */
 	prev_fx_algo = fx_algo;
@@ -206,6 +210,9 @@ void fx_select_algo(uint8_t algo)
 		
 	/* switch to next effect */
 	fx_algo = algo;
+	
+	/* unmute */
+	Audio_mute(0);
 }
 
 /*

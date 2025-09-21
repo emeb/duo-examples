@@ -31,27 +31,20 @@ enum fadestate
     FADE_OUT,
 };
 
-uint32_t bufsz;
-int16_t *dlybuf, *wptr;
 int16_t *prcbuf;
 uint32_t fadecnt;
-int32_t gain;
-uint8_t init, fadest, pt;
-int32_t frq, phs;
-int16_t sinetab[1024];
+uint8_t init, fadest;
 int16_t audio_sl[4];
-uint64_t audio_load[3];
+uint64_t audio_load[3], audio_load_per, audio_load_dur;
+uint8_t audio_load_pct, audio_load_freeze;
 int16_t audio_mute_state, audio_mute_cnt;
 int16_t prev_wet;
 
 /*
  * init audio
  */
-int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, float amp, float freq)
+int32_t Audio_Init(uint32_t buffer_size)
 {
-	if(verbose)
-		fprintf(stderr, "Audio_Init: proc = %d\n", proc_typ);
-	
 	/* init fx */
 	if(fx_init())
 	{
@@ -70,6 +63,11 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
 	
 	/* audio load calcs */
 	audio_load[0] = audio_load[1] = audio_load[2] = 0;
+	audio_load_per = audio_load_dur = 0;
+	audio_load_pct = 0;
+	
+	/* grab only 1st pass */
+	audio_load_freeze = 0;
 	
 	/* Muting */
 	audio_mute_state = 2;	// start up  muted
@@ -83,48 +81,6 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
 		return 1;
 	}
 	
-	if(verbose)
-		fprintf(stderr, "Audio_Init: allocated %d proc buffer\n", buffer_size);
-	
-#if 0
-	/* NCO */
-	phs = 0;
-	frq = (int32_t)floorf(freq * powf(2.0F, 32.0F) / 48000.0F);
-	
-	/* build sinewave LUT */
-	float th = 0.0F, thinc = 6.2832F/((float)WAV_LEN);
-	for(int i=0;i<WAV_LEN;i++)
-	{
-		sinetab[i] = floorf(32767.0F * sinf(th) + 0.5F);
-		th += thinc;
-	}
-#endif
-	
-	/* processing type */
-	pt = proc_typ%NUM_PT;
-	
-	/* output gain shift */
-	gain = amp * 32767.0F;
-	
-	/* delay buffer */
-    bufsz = CHLS*dlysamp;
-    dlybuf = (int16_t *)malloc(bufsz*sizeof(int16_t));
-	if(!dlybuf)
-	{
-		fprintf(stderr, "Audio_Init: couldn't allocate delay buffer\n");
-		free(prcbuf);
-		fx_deinit();
-		return 1;
-	}
-	
- 	if(verbose)
-		fprintf(stderr, "Audio_Init: allocated %d delay buffer\n", bufsz);
-	
-	wptr = dlybuf;
-    init = 1;
-    fadecnt = FADE_MAX;
-    fadest =  FADE_IN;
-    
 	return 0;
 }
 
@@ -133,8 +89,8 @@ int32_t Audio_Init(uint32_t buffer_size, uint32_t dlysamp, uint8_t proc_typ, flo
  */
 void Audio_Close(void)
 {
-    if(dlybuf)
-        free(dlybuf);
+    if(prcbuf)
+        free(prcbuf);
 }
 
 /*
@@ -150,119 +106,14 @@ void level_calc(int16_t sig, int16_t *level)
 		*level = sig;
 }
 
-#if 0
-/*
- * sine waveform interp
- */
-int16_t sine_interp(uint32_t phs)
-{
-	
-	int32_t a, b, sum;
-	uint32_t ip, fp;
-	
-	ip = phs>>(32-WAV_PHS);
-	a = sinetab[ip];
-	b = sinetab[(ip + 1)&(WAV_LEN-1)];
-	
-	fp = (phs & ((1<<(32-WAV_PHS))-1)) >> ((32-WAV_PHS)-INTERP_BITS);
-	sum = b * fp;
-	sum += a * (((1<<INTERP_BITS)-1)-fp);
-	
-	return sum >> INTERP_BITS; 
-}
-
-/*
- * compute effect on buffers
- */
-void fx_proc(int16_t *dst, int16_t *src, uint32_t len)
-{
-	uint32_t index;
-	int16_t tbuf[CHLS];
-    int32_t tmpscl;
-    uint8_t chl;
-	
-	/* process I2S data */
-	for(index=0;index<len;index++)
-	{
-		/* apply chosen effect */
-		if(pt == 2)
-		{
-			/* delayed loopback */
-			/* get output from buffer */
-			if(!init)
-			{
-				for(chl=0;chl<CHLS;chl++)
-					tbuf[chl] = *(wptr+chl);
-			}
-			else
-			{
-				/* no output until buffer filled */
-				for(chl=0;chl<CHLS;chl++)
-					tbuf[chl] = 0;
-			}
-			
-			/* save input in buffer */
-			for(chl=0;chl<CHLS;chl++)
-			{
-				tmpscl = *src++;
-				if(fadest == FADE_IN)
-					tmpscl = (tmpscl * (FADE_MAX-fadecnt))>>FADE_BITS;
-				
-				*wptr++ = tmpscl;
-				*dst++ = tbuf[chl];
-			}
-			
-			/* wrap pointer */
-			if((wptr-dlybuf) >= bufsz)
-			{
-				wptr = dlybuf;
-				//printf("%1d",init);
-				//fflush(stdout);
-				init = 0;
-			}
-			
-			/* update fader */
-			if(fadecnt)
-			{
-				fadecnt--;
-				if(fadecnt==0)
-					fadest = FADE_OFF;
-			}
-		}
-		else if(pt==3)
-		{
-			/* immediate loopback */
-			for(chl=0;chl<CHLS;chl++)
-				*dst++ = (*src++);
-		}
-		else if(pt==1)
-		{
-			/* sawtooth generation */
-			int32_t wav = (((int32_t)phs >> 16)*gain) >> 15;
-			*dst++ = wav;
-			*dst++ = -wav;
-			phs += frq;
-		}
-		else
-		{
-			/* sine generation */
-			int32_t wav = (sine_interp((uint32_t)phs)*gain)>>15;
-			*dst++ = wav;
-			*dst++ = -wav;
-			phs += frq;
-		}
-	}
-}
-#endif
-
 /*
  * process the audio
  */
-void Audio_Process(char *rdbuf, int inframes)
+void Audio_Process(char *wrbuf, char *rdbuf, int inframes)
 {
 	int16_t *src = (int16_t *)rdbuf;
 	int16_t *prc = (int16_t *)prcbuf;
-	int16_t *dst = src;
+	int16_t *dst = (int16_t *)wrbuf;
 	uint16_t index;
 	int32_t wet, dry, mix;
 	float live_wet, slope_wet;
@@ -352,27 +203,27 @@ void Audio_Process(char *rdbuf, int inframes)
 		level_calc(*(dst-1), &audio_sl[3]);
 	}
 	
-	/* get exit time */
+	/* get exit time & compute load */
 	gettimeofday(&tv,NULL);
 	audio_load[1] = 1000000 * tv.tv_sec + tv.tv_usec;
+	
+	if(audio_load_freeze < 2)
+	{
+		audio_load_per = audio_load[0] - audio_load[2];
+		audio_load_dur = audio_load[1] - audio_load[0];
+		audio_load_pct = 100 * audio_load_dur / audio_load_per;
+		//audio_load_freeze++;
+	}
 }
 
 /*
  * get cpu loading
  */
 uint8_t Audio_get_load(void)
-{
-	uint64_t period = audio_load[0] - audio_load[2];
-	uint64_t duration = audio_load[1] - audio_load[0];
-	uint64_t load = 0;
+{	
+	uint8_t load = audio_load_pct;
 	
-	/* update load indicator */
-	if(period != 0)
-	{
-		load = 100*duration/period;
-	}
-	
-	fprintf(stdout, "Load: % 6llu / % 6llu = % 3llu%% \r", duration, period, load);
+	fprintf(stdout, "Load: % 6llu / % 6llu = % 3u%% \r", audio_load_dur, audio_load_per, load);
 	fflush(stdout);
 	
 	return load;
@@ -411,6 +262,7 @@ void Audio_mute(uint8_t enable)
 	{
 		audio_mute_cnt = 0;
 		audio_mute_state = 3;
+		audio_load_freeze = 0;
 		while(audio_mute_state != 0)
 		{
 			usleep(1000);

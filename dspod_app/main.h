@@ -11,6 +11,7 @@
 #include "gfx.h"
 
 extern int sample_rate;
+extern int smps_per_buffer;
 extern int exit_program;
 extern int verbose;
 extern volatile int16_t adc_buffer[4];

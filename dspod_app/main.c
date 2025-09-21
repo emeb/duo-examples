@@ -41,17 +41,17 @@ snd_mixer_t			*mixer_handle;
 snd_mixer_selem_id_t *sid;
 snd_mixer_elem_t	*elem;
 int					nchannels = 2;
-int					buffer_size = 4096;
+int					buffer_size = 2048;		// bytes. frames(samples) is 1/4
 int					sample_rate = 48000;
 int 				bits = 16;
-int                 dlytime = 1;
 int 				err;
 int					exit_program = 0;
 long				play_vol = 80;
-char				*rdbuf;
+char				*rdbuf, *wrbuf;
 unsigned int		fragments = 2;
 int					frame_size;
 snd_pcm_uframes_t   frames, inframes, outframes;
+int					smps_per_buffer;
 float				adc_iir[4];
 volatile int16_t	adc_buffer[4];
 uint8_t				adc_idx;
@@ -237,11 +237,9 @@ void *audio_thread_handler(void *ptr)
 		if(inframes != frames)
 			fprintf(stderr, "Short read from capture device: %lu != %lu\n",
 				inframes, frames);
-
-		/* now processes the frames */
-		Audio_Process(rdbuf, inframes);
-
-		while((long)(outframes = snd_pcm_writei(playback_handle, rdbuf, inframes)) < 0)
+		
+		/* put output and handle errors */
+		while((long)(outframes = snd_pcm_writei(playback_handle, wrbuf, inframes)) < 0)
 		{
 			if (outframes == -EAGAIN)
 				continue;
@@ -254,6 +252,9 @@ void *audio_thread_handler(void *ptr)
 		if (outframes != inframes)
 			fprintf(stderr, "Short write to playback device: %lu != %lu\n",
 				outframes, frames);
+
+		/* now processes the frames */
+		Audio_Process(wrbuf, rdbuf, inframes);
 	}
 	
 	fprintf(stderr, "Audio Thread Quitting.\n");
@@ -269,23 +270,18 @@ int main(int argc, char **argv)
 	extern char *optarg;
 	int opt;
 	struct sigaction sigIntHandler;
-	int i, codec = 0, proc = 0;
-	float amp = 0.6F, freq = 1000.0F;
+	int i, codec = 0;
 	int iret;
     uint64_t samples;
 	int16_t val = 0;
 	uint8_t btn = 0;
-
+    int errorstat = 1;
+	
 	/* parse options */
 	while((opt = getopt(argc, argv, "a:b:ci:o:p:r:t:vVh")) != EOF)
 	{
 		switch(opt)
 		{
-			case 'a':
-				/* amplitude */
-				amp = atof(optarg);
-				break;
-			
 			case 'b':
 				/* buffer size */
 				buffer_size = atoi(optarg);
@@ -306,11 +302,6 @@ int main(int argc, char **argv)
 				snd_device_out = optarg;
 				break;
 
-			case 'p':
-				/* process type */
-				proc = atoi(optarg);
-				break;
-
 			case 'r':
 				/* sample rate */
 				sample_rate = atoi(optarg);
@@ -326,11 +317,6 @@ int main(int argc, char **argv)
 				}
 				break;
             
-            case 't':
-                /* time delay */
-				dlytime = atoi(optarg);
-                break;
-				
 			case 'v':
 				verbose = 1;
 				break;
@@ -343,15 +329,11 @@ int main(int argc, char **argv)
 			case '?':
 				fprintf(stderr, "USAGE: %s [options]\n", argv[0]);
 				fprintf(stderr, "Version %s, %s %s\n", swVersionStr, bdate, btime);
-				fprintf(stderr, "Options: -a <amplitude  >    Default: %f\n", amp);
-				fprintf(stderr, "         -b <Buffer Size>    Default: %d\n", buffer_size);
+				fprintf(stderr, "Options: -b <Buffer Size>    Default: %d\n", buffer_size);
 				fprintf(stderr, "         -c init codec (default no)\n");
-				fprintf(stderr, "         -f <freq>           Default: %f\n", freq);
 				fprintf(stderr, "         -i <input device>   Default: %s\n", snd_device_in);
 				fprintf(stderr, "         -o <output device>  Default: %s\n", snd_device_out);
-				fprintf(stderr, "         -p <process type  > Default: %d\n", proc);
 				fprintf(stderr, "         -r <sample rate Hz> Default: %d\n", sample_rate);
-				fprintf(stderr, "         -t <time secs>      Default: %d\n", dlytime);
 				fprintf(stderr, "         -v enables verbose progress messages\n");
 				fprintf(stderr, "         -V prints the tool version\n");
 				fprintf(stderr, "         -h prints this help\n");
@@ -369,7 +351,7 @@ int main(int argc, char **argv)
 	if(gfx_init(&ST7789_fbdev_drvr))
 	{
 		fprintf(stderr, "Couldn't init graphics lib\n");
-		exit(1);
+		goto err_gfx;
 	}
 	menu_splash(swVersionStr, bdate, btime);
 	ST7789_fbdev_setBacklight(1);
@@ -381,8 +363,7 @@ int main(int argc, char **argv)
 	if(encoder_init())
 	{
 		fprintf(stderr, "Error initializing encoder.\n");
-		ST7789_fbdev_deinit();
-		exit(1);
+		goto err_encoder;
 	}
 	
 	if(verbose)
@@ -392,9 +373,7 @@ int main(int argc, char **argv)
 	if(adc_init("/dev/cvi-saradc0"))
 	{
 		fprintf(stderr, "Couldn't open ADC device\n");
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-		exit(1);
+		goto err_adc;
 	}
 	
 	if(verbose)
@@ -406,31 +385,16 @@ int main(int argc, char **argv)
 		if(codec_nau88c22(verbose, 1, 0, 0))
 		{
 			fprintf(stderr, "Error initializing codec\n");
-			adc_deinit();
-			encoder_deinit();
-			ST7789_fbdev_deinit();
-			exit(1);
+			goto err_codec;
 		}
 		printf("Codec initialized\n");
 	}
 	
 	/* set up audio processing */
-    samples  = sample_rate * dlytime;
-    if(samples > ((uint64_t)1<<32))
-    {
-		fprintf(stderr, "Requested time exceeds max\n");
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-        exit(1);
-    }
-	if(Audio_Init(buffer_size, samples, proc, amp, freq))
+	if(Audio_Init(buffer_size))
     {
 		fprintf(stderr, "Audio Init failed\n");
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-        exit(1);
+		goto err_audio;
     }
 	
 	if(verbose)
@@ -440,20 +404,13 @@ int main(int argc, char **argv)
 	if((err = snd_pcm_open(&playback_handle, snd_device_out, SND_PCM_STREAM_PLAYBACK, 0)) < 0)
 	{
 		fprintf(stderr, "cannot open input audio device %s: %s\n", snd_device_in, snd_strerror(err));
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-		exit(1);
+		goto err_pbh;
 	}
 	
 	if((err = snd_pcm_open(&capture_handle, snd_device_in, SND_PCM_STREAM_CAPTURE, 0)) < 0)
 	{
 		fprintf(stderr, "cannot open input audio device %s: %s\n", snd_device_out, snd_strerror(err));
-		snd_pcm_close(capture_handle);
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-		exit(1);
+		goto err_caph;
 	}
 
 	/* set up both devices identically */
@@ -465,9 +422,13 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Bytes/Frame = %d\n", frame_size);
 	frames = buffer_size / frame_size;
 	fprintf(stderr, "Frames/buffer = %lu\n", frames);
+	smps_per_buffer = frames;
 	
 	/* allocate the audio buffer */
-	rdbuf = (char *)malloc(buffer_size);
+	if(!(rdbuf = (char *)malloc(buffer_size)))
+		goto err_rdbuf;
+	if(!(wrbuf = (char *)malloc(buffer_size)))
+		goto err_wrbuf;
 		
 	/* wait for splash */
 	if(verbose)
@@ -496,10 +457,7 @@ int main(int argc, char **argv)
 	if(iret)
 	{
 		fprintf(stderr, "main: error creating ADC thread\n");
-		adc_deinit();
-		encoder_deinit();
-		ST7789_fbdev_deinit();
-		exit(1);
+		goto err_adcthread;
 	}
 
 	if(verbose)
@@ -507,7 +465,23 @@ int main(int argc, char **argv)
     
 	/* start audio thread */
 	fprintf(stderr, "main: starting audio thread...\n");
+#if 1
+	pthread_attr_t thread_attr;
+	pthread_attr_init(&thread_attr);
+	if(verbose)
+		fprintf(stderr, "Audio Thread priority high\n");
+	pthread_attr_setschedpolicy(&thread_attr, SCHED_FIFO);
+	struct sched_param sched_param;
+	sched_param.sched_priority = 10;
+	pthread_attr_setschedparam(&thread_attr, &sched_param);
+	pthread_attr_setinheritsched(&thread_attr, PTHREAD_EXPLICIT_SCHED);
+	iret = pthread_create(&audio_thread, &thread_attr, audio_thread_handler, NULL);
+	pthread_attr_destroy(&thread_attr);
+#else
+	if(verbose)
+		fprintf(stderr, "Audio Thread priority normal\n");
 	iret = pthread_create(&audio_thread, NULL, audio_thread_handler, NULL);
+#endif
 	if(!iret)
 	{
 		/* unmute */
@@ -529,20 +503,32 @@ int main(int argc, char **argv)
 		
 		pthread_join(audio_thread, NULL);
 		fprintf(stderr, "main: audio thread joined...\n");
+		errorstat = 0;
 	}
 	else
 		fprintf(stderr, "main: error creating audio thread\n");
 	
 	/* clean up */
+err_adcthread:
 	snd_pcm_drain(playback_handle);
 	snd_pcm_drop(capture_handle);
+	free(wrbuf);
+err_wrbuf:
 	free(rdbuf);
-	snd_pcm_close(playback_handle);
+err_rdbuf:
 	snd_pcm_close(capture_handle);
+err_caph:
+	snd_pcm_close(playback_handle);
+err_pbh:
     Audio_Close();
+err_audio:
+err_codec:
 	adc_deinit();
+err_adc:
 	encoder_deinit();
+err_encoder:
 	ST7789_fbdev_deinit();
-
-	return 0;
+err_gfx:
+	
+	return errorstat;
 }

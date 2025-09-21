@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include "main.h"
 #include "dsp_lib.h"
 #include "adc.h"
@@ -19,7 +20,7 @@
 
 #define FX_NUM_ALGOS  6
 #define FX_MAX_PARAMS 3
-#define FX_MAX_MEM (129*1024)		// 129kB
+#define FX_MAX_MEM (320*1024)		// 320kB
 #define FX_EXT_MEM (16*1024*1024)	// 16MB
 
 /* pre-allocated external memory */

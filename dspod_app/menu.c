@@ -184,18 +184,31 @@ void menu_render(void)
 			menu_render_wetdry();
 			break;
 	
-		case 2:	// bottom region
-			/* CV indicators */
+		case 2:	/* CV indicators */
 			menu_render_cvs();
-			
-			/* VU meters */
+			break;
+		
+		case 3:
 			widg_bargraphHG(30, 140, MENU_VU_WIDTH, 8, Audio_get_level(0)/328);
-			widg_bargraphHG(30, 150, MENU_VU_WIDTH, 8, Audio_get_level(1)/328);
 			widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 140, MENU_VU_WIDTH, 8, Audio_get_level(2)/328);
+			break;
+		
+		case 4:
+			widg_bargraphHG(30, 150, MENU_VU_WIDTH, 8, Audio_get_level(1)/328);
 			widg_bargraphHG(MENU_XMAX-10-16-6-MENU_VU_WIDTH, 150, MENU_VU_WIDTH, 8, Audio_get_level(3)/328);
 			break;
+		
+		case 5:
+			break;
+		
+		case 6:
+			break;
+		
+		default:
+			/* do nothing */
+			break;
 	}
-	vslice = (vslice + 1) % 3;
+	vslice = (vslice + 1) % 5;
 }
 
 /*
@@ -252,7 +265,7 @@ void menu_process(void)
 			gfx_set_backcolor(GFX_DGRAY);
 		}
 		
-		if(enc_btn)
+		if(enc_btn == 1)
 		{
 			/* erase next algo box */
 			gfx_set_forecolor(GFX_DGRAY);

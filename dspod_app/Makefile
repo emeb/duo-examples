@@ -16,6 +16,8 @@ CC = $(TOOLCHAIN_PREFIX)gcc
 
 LDFLAGS += -lwiringx -lasound
 
+CFLAGS += -g
+
 SOURCE = $(wildcard *.c)
 OBJS = $(patsubst %.c,%.o,$(SOURCE))
 
