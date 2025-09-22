@@ -55,7 +55,7 @@ void menu_splash(const char *swVersionStr, const char *bdate, const char *btime)
 void menu_show_cpuload(void)
 {
 	static uint8_t prev_load = 255;
-	uint8_t curr_load = Audio_get_load();
+	uint8_t curr_load = get_load();
 	char textbuf[32];
 	
 	if(curr_load != prev_load)

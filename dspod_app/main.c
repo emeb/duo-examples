@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <alsa/asoundlib.h>
 #include <pthread.h>
+#include <sys/time.h>
 #include "main.h"
 #include "st7789_fbdev.h"
 #include "encoder.h"
@@ -56,6 +57,9 @@ float				adc_iir[4];
 volatile int16_t	adc_buffer[4];
 uint8_t				adc_idx;
 int					verbose = 0;
+uint64_t audio_load[5], audio_load_per, audio_load_rd, audio_load_wd,
+	audio_load_pd;
+uint8_t audio_load_pct;
 
 /*
  * set up an audio device
@@ -219,10 +223,24 @@ void *adc_thread_handler(void *ptr)
  */
 void *audio_thread_handler(void *ptr)
 {
+	struct timeval tv;
+	
 	/* processing loop */
 	fprintf(stderr, "Starting Audio Thread\n");
+	
+	/* audio load calcs */
+	audio_load[0] = audio_load[1] = audio_load[2] = 0;
+	audio_load[3] = audio_load[4] = 0;
+	audio_load_rd = audio_load_wd = audio_load_pd = audio_load_per = 0;
+	audio_load_pct = 0;
+	
 	while(!exit_program)
 	{
+		/* get read entry time */
+		gettimeofday(&tv,NULL);
+		audio_load[4] = audio_load[0];
+		audio_load[0] = 1000000 * tv.tv_sec + tv.tv_usec;
+	
 		/* get input & handle errors */
 		while((long)(inframes = snd_pcm_readi(capture_handle, rdbuf, frames)) < 0)
 		{
@@ -237,6 +255,10 @@ void *audio_thread_handler(void *ptr)
 		if(inframes != frames)
 			fprintf(stderr, "Short read from capture device: %lu != %lu\n",
 				inframes, frames);
+		
+		/* get write entry time */
+		gettimeofday(&tv,NULL);
+		audio_load[1] = 1000000 * tv.tv_sec + tv.tv_usec;
 		
 		/* put output and handle errors */
 		while((long)(outframes = snd_pcm_writei(playback_handle, wrbuf, inframes)) < 0)
@@ -253,12 +275,40 @@ void *audio_thread_handler(void *ptr)
 			fprintf(stderr, "Short write to playback device: %lu != %lu\n",
 				outframes, frames);
 
+		/* get proc entry time */
+		gettimeofday(&tv,NULL);
+		audio_load[2] = 1000000 * tv.tv_sec + tv.tv_usec;
+		
 		/* now processes the frames */
 		Audio_Process(wrbuf, rdbuf, inframes);
+	
+		/* get proc exit time & compute load */
+		gettimeofday(&tv,NULL);
+		audio_load[3] = 1000000 * tv.tv_sec + tv.tv_usec;
+		audio_load_per = audio_load[0] - audio_load[4];
+		audio_load_rd = audio_load[1] - audio_load[0];
+		audio_load_wd = audio_load[2] - audio_load[1];
+		audio_load_pd = audio_load[3] - audio_load[2];
+		audio_load_pct = 100 * audio_load_pd / audio_load_per;
 	}
 	
 	fprintf(stderr, "Audio Thread Quitting.\n");
 	return NULL;
+}
+
+/*
+ * get cpu loading
+ */
+uint8_t get_load(void)
+{	
+	uint8_t load = audio_load_pct;
+	
+	/* write to console status line */
+	fprintf(stdout, "rd: % 6llu wd: % 6llu pd % 6llu per: % 6llu = % 3u%% \r",
+		audio_load_rd, audio_load_wd, audio_load_pd, audio_load_per, load);
+	fflush(stdout);
+	
+	return load;
 }
 
 /*

@@ -16,4 +16,6 @@ extern int exit_program;
 extern int verbose;
 extern volatile int16_t adc_buffer[4];
 
+uint8_t get_load(void);
+
 #endif

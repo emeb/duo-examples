@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
-#include <sys/time.h>
 #include "main.h"
 #include "audio.h"
 #include "dsp_lib.h"
@@ -35,8 +34,6 @@ int16_t *prcbuf;
 uint32_t fadecnt;
 uint8_t init, fadest;
 int16_t audio_sl[4];
-uint64_t audio_load[3], audio_load_per, audio_load_dur;
-uint8_t audio_load_pct, audio_load_freeze;
 int16_t audio_mute_state, audio_mute_cnt;
 int16_t prev_wet;
 
@@ -60,14 +57,6 @@ int32_t Audio_Init(uint32_t buffer_size)
 	
 	/* signal levels */
 	audio_sl[0] = audio_sl[1] = audio_sl[2] = audio_sl[3] = 0;
-	
-	/* audio load calcs */
-	audio_load[0] = audio_load[1] = audio_load[2] = 0;
-	audio_load_per = audio_load_dur = 0;
-	audio_load_pct = 0;
-	
-	/* grab only 1st pass */
-	audio_load_freeze = 0;
 	
 	/* Muting */
 	audio_mute_state = 2;	// start up  muted
@@ -117,12 +106,6 @@ void Audio_Process(char *wrbuf, char *rdbuf, int inframes)
 	uint16_t index;
 	int32_t wet, dry, mix;
 	float live_wet, slope_wet;
-	struct timeval tv;
-	
-	/* get entry time */
-	gettimeofday(&tv,NULL);
-	audio_load[2] = audio_load[0];
-	audio_load[0] = 1000000 * tv.tv_sec + tv.tv_usec;
 	
 	/* check input levels */
 	for(index=0;index<inframes;index++)
@@ -202,31 +185,6 @@ void Audio_Process(char *wrbuf, char *rdbuf, int inframes)
 		level_calc(*(dst-2), &audio_sl[2]);
 		level_calc(*(dst-1), &audio_sl[3]);
 	}
-	
-	/* get exit time & compute load */
-	gettimeofday(&tv,NULL);
-	audio_load[1] = 1000000 * tv.tv_sec + tv.tv_usec;
-	
-	if(audio_load_freeze < 2)
-	{
-		audio_load_per = audio_load[0] - audio_load[2];
-		audio_load_dur = audio_load[1] - audio_load[0];
-		audio_load_pct = 100 * audio_load_dur / audio_load_per;
-		//audio_load_freeze++;
-	}
-}
-
-/*
- * get cpu loading
- */
-uint8_t Audio_get_load(void)
-{	
-	uint8_t load = audio_load_pct;
-	
-	fprintf(stdout, "Load: % 6llu / % 6llu = % 3u%% \r", audio_load_dur, audio_load_per, load);
-	fflush(stdout);
-	
-	return load;
 }
 
 /*
@@ -262,7 +220,6 @@ void Audio_mute(uint8_t enable)
 	{
 		audio_mute_cnt = 0;
 		audio_mute_state = 3;
-		audio_load_freeze = 0;
 		while(audio_mute_state != 0)
 		{
 			usleep(1000);
