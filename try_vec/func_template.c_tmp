@@ -1,0 +1,40 @@
+/*
+ * func_template.c - template
+ * 10-5-2025 E. Brombaugh
+ */
+
+#include "func_template.h"
+
+/*
+ * init not used in this snippet
+ */
+int init_func_template(int len)
+{
+	return 0;
+}
+
+/*
+ * this is the original non-vector code
+ */
+void scalar_func_template(float *pSrc, int fftLen)
+{
+}
+
+/*
+ * this is the vectorized version - does it match?
+ */
+void vector_func_template(float *pSrc, int fftLen)
+{
+}
+
+/*
+ * bundle them up
+ */
+const snippet func_template = 
+{
+	"template",
+	init_func_template,
+	scalar_func_template,
+	vector_func_template,
+};
+

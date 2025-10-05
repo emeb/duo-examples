@@ -1,0 +1,13 @@
+/*
+ * func_template.h - template
+ * 10-5-2025 E. Brombaugh
+ */
+ 
+#ifndef __func_template__
+#define __func_template__
+
+#include "main.h"
+
+extern const snippet func_template;
+
+#endif
